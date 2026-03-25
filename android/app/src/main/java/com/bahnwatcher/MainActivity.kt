@@ -1,9 +1,13 @@
 package com.bahnwatcher
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -50,6 +54,19 @@ fun BahnWatcherApp() {
     val settings by vm.settings.collectAsState()
     var selectedRoute by remember { mutableStateOf("favorites") }
     val context = LocalContext.current
+
+    // Request POST_NOTIFICATIONS permission on Android 13+ at first launch.
+    // We launch this once; the result is handled silently – the SettingsScreen
+    // shows the current state and lets the user re-grant if denied.
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* permission result visible in SettingsScreen */ }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     LaunchedEffect(settings.monitoring) {
         if (settings.monitoring) MonitoringWorker.schedule(context)
