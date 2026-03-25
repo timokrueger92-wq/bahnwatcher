@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.*
+import com.bahnwatcher.R
 import com.bahnwatcher.data.model.Favorite
 import com.bahnwatcher.data.repository.BahnRepository
 import kotlinx.coroutines.flow.first
@@ -70,7 +71,7 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
             createNotificationChannel(context)
             val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

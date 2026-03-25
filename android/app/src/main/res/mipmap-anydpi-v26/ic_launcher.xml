@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dark navy background matching the icon's own background color -->
+    <background android:drawable="@color/ic_launcher_background" />
+    <!-- Foreground: the icon artwork centered in the 72dp safe zone -->
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <!-- Monochrome version for Android 13+ themed icons -->
+    <monochrome android:drawable="@drawable/ic_notification" />
+</adaptive-icon>
