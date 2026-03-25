@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#080c14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BahnWatcher</title>
+<!-- Google Fonts werden NICHT extern geladen (DSGVO/EuGH C-311/18). Systemschriften werden verwendet. -->
+<style>
+:root{
+  --bg:#080c14;--bg2:#0e1624;--bg3:#141e30;
+  --border:#1e2e44;--border2:#263a54;
+  --accent:#0ea5e9;--accent2:#38bdf8;--accentD:#0369a1;
+  --green:#10b981;--yellow:#f59e0b;--red:#f43f5e;--purple:#8b5cf6;
+  --text:#e2eaf5;--text2:#7a93ae;--text3:#3d556a;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;--mono:'SF Mono','Cascadia Code','Fira Code',Consolas,'Courier New',monospace;
+  --r:14px;--sb:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100%;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+.bgc{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.bgc::before{content:'';position:absolute;top:-30vh;left:50%;transform:translateX(-50%);width:120vw;height:60vh;background:radial-gradient(ellipse at 50% 0%,rgba(14,165,233,.06) 0%,transparent 70%)}
+.bgc::after{content:'';position:absolute;bottom:-20vh;right:-10vw;width:60vw;height:50vh;background:radial-gradient(ellipse,rgba(139,92,246,.04) 0%,transparent 70%)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(14,165,233,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(14,165,233,.025) 1px,transparent 1px);background-size:48px 48px}
+#app{position:relative;z-index:1;max-width:430px;margin:0 auto;padding-bottom:calc(72px + var(--sb));min-height:100vh}
+
+/* HEADER */
+.hdr{padding:20px 18px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.bmark{width:38px;height:38px;background:linear-gradient(145deg,var(--accent),var(--accentD));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 24px rgba(14,165,233,.28),inset 0 1px 0 rgba(255,255,255,.1);flex-shrink:0}
+.bname{font-size:21px;font-weight:700;letter-spacing:-.4px;line-height:1}
+.bname em{font-style:normal;color:var(--accent2)}
+.bsub{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-top:2px}
+.ibtn{width:34px;height:34px;background:var(--bg2);border:1px solid var(--border);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;transition:all .2s;color:var(--text2)}
+.ibtn:hover{border-color:var(--border2);color:var(--text)}
+
+/* TABS */
+.tabbar{display:flex;gap:3px;padding:0 18px;margin-bottom:18px}
+.tab{flex:1;padding:8px 4px;background:transparent;border:1px solid var(--border);color:var(--text3);font-family:var(--sans);font-size:11px;font-weight:600;cursor:pointer;border-radius:9px;transition:all .2s;letter-spacing:.2px}
+.tab.on{background:var(--bg2);border-color:var(--accent);color:var(--accent2);box-shadow:0 0 12px rgba(14,165,233,.1)}
+.tab:hover:not(.on){border-color:var(--border2);color:var(--text2)}
+
+/* PAGES */
+.page{display:none;padding:0 18px;animation:fin .2s ease}
+.page.on{display:block}
+@keyframes fin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* INPUTS */
+.finput{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:var(--sans);font-size:14px;outline:none;transition:border-color .2s}
+.finput:focus{border-color:var(--accent)}
+.finput::placeholder{color:var(--text3)}
+select.finput{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233d556a'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.flabel{font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:5px}
+.fg{margin-bottom:14px;position:relative}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.slabel{font-family:var(--mono);font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+
+/* AUTOCOMPLETE DROPDOWN — polished */
+.acwrap{position:relative}
+.aclist{
+  position:absolute;top:calc(100% + 4px);left:0;right:0;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  border-radius:12px;
+  overflow:hidden;
+  display:none;
+  z-index:500;
+  box-shadow:0 12px 40px rgba(0,0,0,.5);
+  max-height:220px;overflow-y:auto;
+}
+.aclist.open{display:block;animation:fin .15s ease}
+.acitem{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 13px;
+  cursor:pointer;
+  border-bottom:1px solid var(--border);
+  transition:background .12s;
+}
+.acitem:last-child{border-bottom:none}
+.acitem:hover{background:var(--bg3)}
+.acitem-icon{font-size:15px;flex-shrink:0;opacity:.7}
+.acitem-body{flex:1;min-width:0}
+.acitem-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acitem-sub{font-family:var(--mono);font-size:9.5px;color:var(--text3);margin-top:1px}
+.acitem-products{display:flex;gap:3px;margin-top:3px;flex-wrap:wrap}
+.acprod{font-family:var(--mono);font-size:8.5px;padding:1px 5px;border-radius:4px;background:var(--bg3);border:1px solid var(--border2);color:var(--accent2)}
+.acloading{padding:12px 13px;font-size:12px;color:var(--text3);display:flex;align-items:center;gap:8px}
+
+/* MONITORING BAR */
+.monbar{display:flex;align-items:center;gap:8px;padding:9px 13px;border-radius:10px;margin-bottom:14px;font-size:12px;font-weight:600;border:1px solid transparent;transition:all .3s}
+.monbar.on{background:rgba(16,185,129,.07);border-color:rgba(16,185,129,.2);color:var(--green)}
+.monbar.off{background:var(--bg2);border-color:var(--border);color:var(--text3)}
+.mondot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.monbar.on .mondot{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 2s infinite}
+.monbar.off .mondot{background:var(--text3)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.monr{margin-left:auto;font-family:var(--mono);font-size:10px;opacity:.7}
+
+/* FAV CARD */
+.fcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden;transition:border-color .2s}
+.fcard:hover{border-color:var(--border2)}
+.fcard.sdel{border-color:rgba(245,158,11,.25)}
+.fcard.scan{border-color:rgba(244,63,94,.3)}
+.ftop{display:flex;align-items:stretch;padding:14px 14px 12px;gap:12px}
+.find{width:3px;border-radius:3px;background:var(--green);flex-shrink:0;align-self:stretch;min-height:40px}
+.fcard.sdel .find{background:var(--yellow)}
+.fcard.scan .find{background:var(--red)}
+.fcard.sunk .find{background:var(--text3)}
+.fbody{flex:1;min-width:0}
+.fhead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.ftitle{font-size:15px;font-weight:700;line-height:1.2}
+.pill{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;flex-shrink:0;white-space:nowrap}
+.pok{background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2)}
+.pdel{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.pcan{background:rgba(244,63,94,.1);color:var(--red);border:1px solid rgba(244,63,94,.2)}
+.punk{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+.froute{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);margin-bottom:8px;flex-wrap:wrap}
+.froute strong{color:var(--text);font-weight:600}
+.rsep{color:var(--text3);font-size:11px}
+.fchips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;background:var(--bg3);border:1px solid var(--border);color:var(--text3)}
+.fnext{padding:9px 14px 9px 29px;border-top:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fnext .nt{color:var(--text);font-weight:600;font-size:13px}
+.fnext .nd{color:var(--yellow)}
+.fnext .nc{color:var(--red)}
+.facts{display:flex;gap:6px;padding:0 14px 12px 29px;flex-wrap:wrap}
+.abtn{padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-family:var(--sans);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px}
+.abtn:hover{border-color:var(--border2);color:var(--text2)}
+.abtn.alt:hover{border-color:var(--purple);color:var(--purple)}
+.abtn.del:hover{border-color:var(--red);color:var(--red)}
+
+/* EMPTY */
+.empty{text-align:center;padding:48px 16px;color:var(--text3)}
+.ei{font-size:52px;margin-bottom:14px;opacity:.35}
+.et{font-size:17px;font-weight:700;color:var(--text2);margin-bottom:6px}
+.es{font-size:13px;line-height:1.65}
+
+/* BUTTONS */
+.addbtn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accentD));border:none;border-radius:12px;color:#fff;font-family:var(--sans);font-size:15px;font-weight:700;cursor:pointer;margin-top:14px;transition:all .2s;box-shadow:0 4px 20px rgba(14,165,233,.22)}
+.addbtn:hover{transform:translateY(-1px);box-shadow:0 6px 26px rgba(14,165,233,.32)}
+.addbtn:active{transform:none}
+.addbtn:disabled{opacity:.5;transform:none;cursor:not-allowed}
+.sgo{padding:0 16px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:16px;cursor:pointer;transition:background .2s;flex-shrink:0}
+.sgo:hover{background:var(--accent2)}
+.sbtn{padding:9px 14px;border-radius:8px;border:none;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s}
+.sbtnp{background:var(--accent);color:#fff}
+.sbtnp:hover{background:var(--accent2)}
+.sbtnr{background:var(--bg3);border:1px solid var(--red);color:var(--red)}
+.sbtnr:hover{background:rgba(244,63,94,.08)}
+
+/* SEARCH ROW */
+.srow2{display:flex;gap:8px;margin-bottom:6px}
+.srow2 .finput{flex:1}
+
+/* CONNECTION SEARCH PANEL */
+.conn-search{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.conn-search-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* TIME TYPE TOGGLE */
+.time-toggle{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.ttype{flex:1;padding:9px;background:transparent;border:none;color:var(--text3);font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center}
+.ttype.on{background:var(--accent);color:#fff}
+.ttype:not(.on):hover{background:var(--bg3);color:var(--text2)}
+
+/* CONNECTION RESULT CARD */
+.conn-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:12px;margin-bottom:8px;overflow:hidden;
+  transition:border-color .2s;
+}
+.conn-card:hover{border-color:var(--border2)}
+.conn-top{padding:13px 14px 10px;display:flex;align-items:flex-start;gap:12px}
+.conn-times{flex-shrink:0;min-width:90px}
+.conn-dep{font-family:var(--mono);font-size:20px;font-weight:600;color:var(--text);line-height:1}
+.conn-dep-real{font-family:var(--mono);font-size:11px;margin-top:2px}
+.conn-dep-real.late{color:var(--yellow)}
+.conn-dep-real.ok{color:var(--green)}
+.conn-arr{font-family:var(--mono);font-size:13px;color:var(--text2);margin-top:6px}
+.conn-arr strong{color:var(--text)}
+.conn-info{flex:1;min-width:0}
+.conn-legs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.conn-leg{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);color:var(--accent2)}
+.conn-leg.walking{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.2);color:#a78bfa}
+.conn-dur{font-size:12px;color:var(--text3)}
+.conn-changes{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px}
+.conn-via{font-size:11px;color:var(--text3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conn-save-row{padding:0 14px 12px;display:flex;align-items:center;gap:8px}
+.conn-save-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-family:var(--sans);font-size:13px;outline:none;transition:border-color .2s}
+.conn-save-input:focus{border-color:var(--accent)}
+.conn-save-input::placeholder{color:var(--text3)}
+.conn-save-btn{padding:8px 14px;background:var(--green);border:none;border-radius:8px;color:#fff;font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
+.conn-save-btn:hover{background:#34d399}
+.conn-save-btn.saved{background:var(--bg3);border:1px solid var(--green);color:var(--green);cursor:default}
+
+/* DEP CARD (Abfahrtstafel) */
+.dcard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 13px;margin-bottom:7px;display:grid;grid-template-columns:66px 1fr auto;gap:10px;align-items:center;transition:border-color .2s}
+.dcard:hover{border-color:var(--border2)}
+.dcard.xcan{opacity:.55}
+.dplan{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1;color:var(--text)}
+.dreal{font-family:var(--mono);font-size:11px;margin-top:3px}
+.dreal.ok{color:var(--green)}.dreal.late{color:var(--yellow)}.dreal.gone{color:var(--red)}
+.dlrow{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.ltag{font-family:var(--mono);font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(14,165,233,.12);border:1px solid rgba(14,165,233,.2);color:var(--accent2);flex-shrink:0}
+.ddir{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.dplat{font-family:var(--mono);font-size:10px;color:var(--text3)}
+
+/* ALTERNATIVES */
+.altpanel{background:var(--bg2);border:1px solid rgba(139,92,246,.25);border-radius:var(--r);margin-bottom:10px;overflow:hidden;animation:fin .25s ease}
+.aphead{display:flex;align-items:center;gap:8px;padding:13px 14px;border-bottom:1px solid var(--border);background:rgba(139,92,246,.05)}
+.apicon{font-size:16px}.aptitle{font-size:14px;font-weight:700;flex:1}
+.apsub{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.apclose{background:transparent;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1}
+.apclose:hover{color:var(--text)}
+.aitem{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+.aitem:last-child{border-bottom:none}
+.aitem.ok{background:rgba(16,185,129,.025)}
+.aitem.tight{background:rgba(245,158,11,.025)}
+.aitem.far{opacity:.5}
+.awkwrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;width:44px}
+.awkc{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+.aitem.ok .awkc{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25)}
+.aitem.tight .awkc{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25)}
+.aitem.far .awkc{background:var(--bg3);border:1px solid var(--border)}
+.awktime{font-family:var(--mono);font-size:9px;color:var(--text3);text-align:center}
+.abody{flex:1;min-width:0}
+.astation{font-size:13px;font-weight:700;margin-bottom:5px}
+.adep{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);margin-bottom:3px;flex-wrap:wrap}
+.adep .at{font-family:var(--mono);font-size:13px;color:var(--text);font-weight:600}
+.adep .al{font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border2);color:var(--accent2)}
+.adep .af{color:var(--green);font-size:10px;font-weight:600}
+.adep .ag{color:var(--yellow);font-size:10px;font-weight:600}
+.anoconn{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.mapsbtn{flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:44px;height:44px;background:var(--bg3);border:1px solid var(--border2);border-radius:9px;color:var(--text2);text-decoration:none;font-size:18px;transition:all .2s}
+.mapsbtn:hover{border-color:var(--accent);color:var(--accent2)}
+.mapslbl{font-size:8px;font-family:var(--mono);color:var(--text3)}
+
+/* SETTINGS */
+.scard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.sctitle{font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text3);padding:11px 15px 7px;border-bottom:1px solid var(--border)}
+.sr{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;border-bottom:1px solid var(--border);gap:12px}
+.sr:last-child{border-bottom:none}
+.srl{font-size:14px;font-weight:600}.srs{font-size:11px;color:var(--text3);margin-top:2px}
+.toggle{width:42px;height:23px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;cursor:pointer;position:relative;transition:all .25s;flex-shrink:0}
+.toggle.on{background:var(--accent);border-color:var(--accent);box-shadow:0 0 10px rgba(14,165,233,.25)}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:17px;height:17px;background:#fff;border-radius:50%;transition:transform .25s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle.on::after{transform:translateX(19px)}
+.ntfyrow{display:flex;gap:8px;padding:11px 15px;border-bottom:1px solid var(--border)}
+.ntfyrow:last-child{border-bottom:none}
+.ntfyrow .finput{flex:1;font-size:13px;padding:9px 12px}
+.icard{background:rgba(14,165,233,.05);border:1px solid rgba(14,165,233,.14);border-radius:12px;padding:13px 15px;margin-bottom:12px;font-size:12.5px;line-height:1.65;color:var(--text2)}
+.icard strong{color:var(--accent2)}
+.icard a{color:var(--accent);text-decoration:none}
+
+/* DAYS */
+.daysrow{display:flex;gap:5px}
+.daybtn{flex:1;padding:7px 3px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text3);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;text-align:center}
+.daybtn.on{background:rgba(14,165,233,.12);border-color:rgba(14,165,233,.3);color:var(--accent2)}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(4,8,16,.75);backdrop-filter:blur(6px);z-index:200;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.sheet{background:var(--bg2);border:1px solid var(--border2);border-radius:20px 20px 0 0;width:100%;max-width:430px;padding:18px 18px calc(18px + var(--sb));max-height:92vh;overflow-y:auto;animation:sup .3s cubic-bezier(.22,.68,0,1.2)}
+@keyframes sup{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.shandle{width:38px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px}
+.stitle{font-size:20px;font-weight:700;margin-bottom:18px}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:rgba(8,12,20,.92);backdrop-filter:blur(14px);border-top:1px solid var(--border);display:flex;padding:6px 0 calc(6px + var(--sb));z-index:100}
+.bni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:6px 4px;border-radius:10px;color:var(--text3);transition:color .2s;font-family:var(--sans)}
+.bni.on{color:var(--accent2)}
+.bnicon{font-size:21px;line-height:1}
+.bnlbl{font-size:9.5px;font-weight:600;letter-spacing:.4px}
+
+/* MISC */
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:11px 20px;font-size:13px;font-weight:600;color:var(--text);opacity:0;transition:all .28s;z-index:300;white-space:nowrap;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.nores{text-align:center;padding:30px 16px;color:var(--text3);font-size:13px}
+
+/* PWA INSTALL BANNER */
+.install-banner{
+  display:none;
+  align-items:center;
+  gap:10px;
+  margin:10px 18px 0;
+  padding:11px 14px;
+  background:rgba(14,165,233,.08);
+  border:1px solid rgba(14,165,233,.2);
+  border-radius:11px;
+  font-size:12px;
+  color:var(--accent2);
+  animation:fin .3s ease;
+}
+.install-banner.visible{display:flex}
+.install-banner-text{flex:1;line-height:1.5}
+.install-banner-text strong{display:block;margin-bottom:1px;font-size:13px}
+.install-banner-btn{
+  padding:7px 14px;
+  background:var(--accent);
+  border:none;border-radius:8px;
+  color:#fff;font-family:var(--sans);font-size:12px;font-weight:700;
+  cursor:pointer;flex-shrink:0;transition:all .2s;white-space:nowrap;
+}
+.install-banner-btn:hover{background:var(--accent2)}
+.install-banner-close{
+  background:none;border:none;color:var(--text3);
+  font-size:16px;cursor:pointer;padding:2px;line-height:1;flex-shrink:0;
+}
+.install-banner-close:hover{color:var(--text)}
+
+.altload{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px;color:var(--text3);font-size:13px}
+
+/* ══════════════════════════════════════
+   DSGVO CONSENT LAYER
+══════════════════════════════════════ */
+.gdpr-overlay{position:fixed;inset:0;background:rgba(4,8,16,.92);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:flex-end;justify-content:center}
+.gdpr-overlay.hidden{display:none}
+.gdpr-sheet{background:#0e1624;border:1px solid #1e2e44;border-radius:20px 20px 0 0;width:100%;max-width:430px;padding:24px 22px 32px;max-height:90vh;overflow-y:auto}
+.gdpr-logo{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.gdpr-logo-mark{width:36px;height:36px;background:linear-gradient(145deg,#0ea5e9,#0369a1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.gdpr-logo-text{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.gdpr-logo-text em{font-style:normal;color:#38bdf8}
+.gdpr-title{font-size:17px;font-weight:700;margin-bottom:8px}
+.gdpr-intro{font-size:13px;color:#7a93ae;line-height:1.65;margin-bottom:18px}
+.gdpr-section{background:#141e30;border:1px solid #1e2e44;border-radius:12px;overflow:hidden;margin-bottom:10px}
+.gdpr-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid #1e2e44}
+.gdpr-row:last-child{border-bottom:none}
+.gdpr-row-label{font-size:13px;font-weight:600;margin-bottom:2px}
+.gdpr-row-sub{font-size:11px;color:#3d556a;line-height:1.5}
+.gdpr-row-sub a{color:#0ea5e9;text-decoration:none}
+.gdpr-badge{font-size:9px;font-family:monospace;padding:2px 7px;border-radius:4px;margin-top:4px;display:inline-block}
+.badge-required{background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);color:#38bdf8}
+.badge-optional{background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);color:#a78bfa}
+.badge-gps{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);color:#fbbf24}
+.gdpr-toggle-sm{width:40px;height:22px;background:#141e30;border:1px solid #263a54;border-radius:11px;cursor:pointer;position:relative;transition:all .25s;flex-shrink:0;margin-top:2px}
+.gdpr-toggle-sm.on{background:#0ea5e9;border-color:#0ea5e9}
+.gdpr-toggle-sm::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .25s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.gdpr-toggle-sm.on::after{transform:translateX(18px)}
+.gdpr-toggle-sm.disabled{opacity:.4;cursor:not-allowed}
+.gdpr-actions{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+.gdpr-accept-all{width:100%;padding:13px;background:linear-gradient(135deg,#0ea5e9,#0369a1);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(14,165,233,.22)}
+.gdpr-accept-selected{width:100%;padding:11px;background:transparent;border:1px solid #1e2e44;border-radius:12px;color:#7a93ae;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.gdpr-accept-selected:hover{border-color:#263a54;color:#e2eaf5}
+.gdpr-footer{text-align:center;margin-top:12px;font-size:10px;color:#3d556a;line-height:1.6;font-family:monospace}
+.gdpr-footer a{color:#0ea5e9;text-decoration:none}
+
+/* DATENSCHUTZ PAGE */
+.privacy-page{padding:0 18px}
+.privacy-section{margin-bottom:20px}
+.privacy-h2{font-size:15px;font-weight:700;margin-bottom:8px;color:#38bdf8}
+.privacy-p{font-size:12.5px;color:#7a93ae;line-height:1.7;margin-bottom:8px}
+.privacy-p a{color:#0ea5e9}
+.privacy-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:8px}
+.privacy-table th{text-align:left;color:#3d556a;font-family:monospace;font-size:10px;letter-spacing:1px;padding:6px 10px;border-bottom:1px solid #1e2e44}
+.privacy-table td{padding:8px 10px;border-bottom:1px solid #1e2e44;color:#7a93ae;vertical-align:top}
+.privacy-table td:first-child{color:#e2eaf5;font-weight:600;white-space:nowrap}
+</style>
+
+<!-- ══ PWA MANIFEST (inline) ══ -->
+<link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22BahnWatcher%22%2C%22short_name%22%3A%22BahnWatcher%22%2C%22description%22%3A%22Echtzeit-Streckenmonitor%20f%C3%BCr%20die%20Rheinachse%22%2C%22start_url%22%3A%22.%2Fbahnwatcher.html%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23080c14%22%2C%22theme_color%22%3A%22%230ea5e9%22%2C%22orientation%22%3A%22portrait%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2527http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2527%2520viewBox%253D%25270%25200%2520512%2520512%2527%253E%253Crect%2520width%253D%2527512%2527%2520height%253D%2527512%2527%2520rx%253D%2527100%2527%2520fill%253D%2527%25230ea5e9%2527%252F%253E%253Ctext%2520x%253D%2527256%2527%2520y%253D%2527360%2527%2520font-size%253D%2527320%2527%2520text-anchor%253D%2527middle%2527%253E%25F0%259F%259A%2586%253C%252Ftext%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BahnWatcher">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     DSGVO CONSENT LAYER
+════════════════════════════════════════ -->
+<div class="gdpr-overlay" id="gdpr-overlay">
+  <div class="gdpr-sheet">
+    <div class="gdpr-logo">
+      <div class="gdpr-logo-mark">🚆</div>
+      <div><div class="gdpr-logo-text">Bahn<em>Watcher</em></div></div>
+    </div>
+    <div class="gdpr-title">Datenschutz &amp; Einwilligungen</div>
+    <div class="gdpr-intro">
+      Bevor du loslegst: Bitte lies kurz, welche Daten die App verarbeitet. BahnWatcher speichert alles lokal auf deinem Gerät – es gibt keinen eigenen Server.
+    </div>
+
+    <div class="gdpr-section">
+      <!-- Technisch notwendig -->
+      <div class="gdpr-row">
+        <div>
+          <div class="gdpr-row-label">Lokale Datenspeicherung</div>
+          <div class="gdpr-row-sub">Deine Favoriten und Einstellungen werden ausschließlich im <strong>localStorage deines Browsers</strong> gespeichert. Kein Server, kein Cloud-Speicher.<br>
+          <span class="gdpr-badge badge-required">technisch notwendig</span></div>
+        </div>
+        <div class="gdpr-toggle-sm on disabled" title="Technisch notwendig, kann nicht deaktiviert werden"></div>
+      </div>
+      <!-- transport.rest -->
+      <div class="gdpr-row">
+        <div>
+          <div class="gdpr-row-label">Echtzeit-Bahndaten (transport.rest)</div>
+          <div class="gdpr-row-sub">Für Abfahrten und Verbindungssuche wird <strong>transport.rest</strong> (Open-Source, betrieben von Jannis R., Deutschland) abgefragt. Dabei wird deine <strong>IP-Adresse</strong> und der Suchbegriff übertragen. Es wird kein Account benötigt.<br>
+          <a href="https://transport.rest/imprint.html" target="_blank">Datenschutz transport.rest ↗</a><br>
+          <span class="gdpr-badge badge-required">für Kernfunktion notwendig</span></div>
+        </div>
+        <div class="gdpr-toggle-sm on disabled" title="Ohne diese API kann die App keine Bahndaten laden"></div>
+      </div>
+    </div>
+
+    <div class="gdpr-section">
+      <!-- GPS -->
+      <div class="gdpr-row">
+        <div>
+          <div class="gdpr-row-label">Standortdaten (GPS)</div>
+          <div class="gdpr-row-sub">Nur für die <strong>Alternativensuche</strong>. Dein Standort wird nur bei ausdrücklichem Klick auf 📍 abgefragt, nie automatisch. Die Koordinaten werden nur für die laufende Suche verwendet und nicht gespeichert.<br>
+          <span class="gdpr-badge badge-gps">nur auf Anfrage · Art. 9 DSGVO</span></div>
+        </div>
+        <div class="gdpr-toggle-sm on" id="gdpr-gps-toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <!-- ntfy.sh -->
+      <div class="gdpr-row">
+        <div>
+          <div class="gdpr-row-label">Push-Benachrichtigungen (ntfy.sh)</div>
+          <div class="gdpr-row-sub">Optional: Wenn du einen <strong>ntfy.sh-Kanal</strong> einrichtest, sendet die App Statusmeldungen an <strong>ntfy.sh</strong> (Open-Source, Betreiber: Philipp C. Heckel, USA/EU-Server verfügbar). Dein Kanalname wird lokal gespeichert.<br>
+          <a href="https://ntfy.sh/docs/privacy/" target="_blank">Datenschutz ntfy.sh ↗</a><br>
+          <span class="gdpr-badge badge-optional">optional</span></div>
+        </div>
+        <div class="gdpr-toggle-sm" id="gdpr-ntfy-toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="gdpr-actions">
+      <button class="gdpr-accept-all" onclick="gdprAcceptAll()">Alle akzeptieren &amp; App starten</button>
+      <button class="gdpr-accept-selected" onclick="gdprAcceptSelected()">Nur Auswahl akzeptieren</button>
+    </div>
+    <div class="gdpr-footer">
+      Art. 6 Abs. 1 lit. a &amp; f DSGVO · Daten bleiben auf deinem Gerät<br>
+      Kein Tracking · Keine Werbung · Keine Weitergabe an Dritte<br>
+      <a href="#" onclick="switchToPrivacy();return false">Vollständige Datenschutzerklärung</a>
+    </div>
+  </div>
+</div>
+
+<div class="bgc"><div class="grid"></div></div>
+<div id="app">
+
+  <!-- API warning banner -->
+  <div id="api-warning" style="display:none;align-items:center;gap:10px;margin:14px 18px 0;padding:11px 14px;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.25);border-radius:11px;font-size:12px;color:#fda4af;line-height:1.5">
+    <span style="font-size:18px;flex-shrink:0">⚠️</span>
+    <div style="flex:1"><strong style="display:block;margin-bottom:2px">API nicht erreichbar</strong>Bitte Internetverbindung prüfen. Haltestellensuche benötigt eine Verbindung zu transport.rest.</div>
+    <button onclick="this.parentElement.style.display='none';checkApi()" style="flex-shrink:0;background:none;border:1px solid rgba(244,63,94,.4);border-radius:7px;color:#fda4af;padding:5px 10px;cursor:pointer;font-size:11px;font-family:var(--sans)">↻ Retry</button>
+  </div>
+
+
+  <!-- PWA INSTALL BANNER -->
+  <div class="install-banner" id="install-banner">
+    <span style="font-size:22px;flex-shrink:0">📲</span>
+    <div class="install-banner-text">
+      <strong>Als App installieren</strong>
+      Zum Homescreen hinzufügen für echtes App-Erlebnis
+    </div>
+    <button class="install-banner-btn" onclick="triggerInstall()">Installieren</button>
+    <button class="install-banner-close" onclick="dismissInstall()">✕</button>
+  </div>
+
+  <header class="hdr">
+    <div class="brand">
+      <div class="bmark">🚆</div>
+      <div>
+        <div class="bname">Bahn<em>Watcher</em></div>
+        <div class="bsub">Echtzeit · Rheinachse</div>
+      </div>
+    </div>
+    <span id="offline-dot" style="display:none;width:8px;height:8px;background:var(--yellow);border-radius:50%;box-shadow:0 0 6px var(--yellow)" title="Offline"></span>
+    <button class="ibtn" onclick="switchTab('settings')">📣</button>
+  </header>
+
+  <div class="tabbar">
+    <button class="tab on"  onclick="switchTab('favorites')">Favoriten</button>
+    <button class="tab"     onclick="switchTab('connections')">Verbindungen</button>
+    <button class="tab"     onclick="switchTab('alternatives')">🚶 Alternativ</button>
+    <button class="tab"     onclick="switchTab('settings')">Einstellungen</button>
+  </div>
+
+  <!-- ═══════════════ FAVORITEN ═══════════════ -->
+  <div class="page on" id="page-favorites">
+    <div id="monbar"></div>
+    <div class="slabel">Meine Verbindungen</div>
+    <div id="favlist"></div>
+    <button class="addbtn" onclick="switchTab('connections')">＋ Verbindung suchen &amp; hinzufügen</button>
+  </div>
+
+  <!-- ═══════════════ VERBINDUNGSSUCHE ═══════════════ -->
+  <div class="page" id="page-connections">
+    <div class="slabel">Verbindung suchen</div>
+
+    <div class="conn-search">
+      <div class="conn-search-title">🔍 Verbindungssuche</div>
+
+      <!-- Von -->
+      <div class="fg">
+        <label class="flabel">Von</label>
+        <div class="acwrap">
+          <input class="finput" id="cs-from" placeholder="Starthaltestelle eingeben…"
+            oninput="acField('cs-from','cs-from-ac','cs-from-id','cs-from-name')"
+            onfocus="acField('cs-from','cs-from-ac','cs-from-id','cs-from-name')"
+            autocomplete="off">
+          <div class="aclist" id="cs-from-ac"></div>
+        </div>
+        <input type="hidden" id="cs-from-id">
+        <input type="hidden" id="cs-from-name">
+      </div>
+
+      <!-- Nach -->
+      <div class="fg">
+        <label class="flabel">Nach</label>
+        <div class="acwrap">
+          <input class="finput" id="cs-to" placeholder="Zielhaltestelle eingeben…"
+            oninput="acField('cs-to','cs-to-ac','cs-to-id','cs-to-name')"
+            onfocus="acField('cs-to','cs-to-ac','cs-to-id','cs-to-name')"
+            autocomplete="off">
+          <div class="aclist" id="cs-to-ac"></div>
+        </div>
+        <input type="hidden" id="cs-to-id">
+        <input type="hidden" id="cs-to-name">
+      </div>
+
+      <!-- Zeit -->
+      <div class="frow fg">
+        <div>
+          <label class="flabel">Datum &amp; Uhrzeit</label>
+          <input class="finput" id="cs-time" type="datetime-local">
+        </div>
+        <div>
+          <label class="flabel">Zeittyp</label>
+          <div class="time-toggle">
+            <button class="ttype on" id="tt-dep" onclick="setTT('dep')">Abfahrt</button>
+            <button class="ttype"    id="tt-arr" onclick="setTT('arr')">Ankunft</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="addbtn" id="cs-search-btn" style="margin-top:0" onclick="searchConnections()">Verbindungen suchen</button>
+    </div>
+
+    <div id="conn-results"></div>
+  </div>
+
+  <!-- ═══════════════ ALTERNATIVEN ═══════════════ -->
+  <div class="page" id="page-alternatives">
+    <div class="slabel">Alternative Haltestellen</div>
+    <div class="icard">
+      🚶 Findet alle Haltestellen im <strong>Gehradius</strong> und prüft, welche du noch rechtzeitig erreichst.
+    </div>
+    <div class="fg">
+      <label class="flabel">Dein Standort / Starthaltestelle</label>
+      <div class="srow2" style="margin-bottom:0">
+        <div class="acwrap" style="flex:1">
+          <input class="finput" id="altin" placeholder="Haltestelle eingeben…"
+            oninput="acField('altin','alt-ac','alt-lat-lon','alt-sname',true)"
+            onfocus="acField('altin','alt-ac','alt-lat-lon','alt-sname',true)"
+            autocomplete="off">
+          <div class="aclist" id="alt-ac"></div>
+        </div>
+        <button class="sgo" onclick="requestGPS()" title="GPS">📍</button>
+      </div>
+      <input type="hidden" id="alt-lat">
+      <input type="hidden" id="alt-lon">
+      <input type="hidden" id="alt-sname">
+    </div>
+    <div class="frow fg">
+      <div>
+        <label class="flabel">Zielrichtung (optional)</label>
+        <input class="finput" id="altdest" placeholder="z.B. Karlsruhe Hbf">
+      </div>
+      <div>
+        <label class="flabel">Max. Gehzeit</label>
+        <select class="finput" id="altwalk">
+          <option value="5">5 Min</option>
+          <option value="10" selected>10 Min</option>
+          <option value="15">15 Min</option>
+        </select>
+      </div>
+    </div>
+    <button class="addbtn" style="margin-top:0" onclick="searchAlts()">Alternativen suchen</button>
+    <div id="altres" style="margin-top:14px"></div>
+  </div>
+
+  <!-- ═══════════════ EINSTELLUNGEN ═══════════════ -->
+  <div class="page" id="page-settings">
+    <div class="icard">
+      <strong>Push via ntfy.sh</strong><br>
+      Installiere die kostenlose <a href="https://ntfy.sh" target="_blank">ntfy-App</a> (iOS &amp; Android), abonniere deinen Kanal und erhalte echte Push-Nachrichten bei Ausfällen.
+    </div>
+    <div class="scard">
+      <div class="sctitle">Push-Kanal</div>
+      <div class="ntfyrow">
+        <input class="finput" id="ntfych" placeholder="z.B. bahnwatcher-max-42" oninput="saveS()">
+        <button class="sbtn sbtnp" onclick="testPush()">Test</button>
+      </div>
+      <div class="sr">
+        <div><div class="srl">Auto-Monitoring</div><div class="srs">Alle 2 Min automatisch prüfen</div></div>
+        <div class="toggle" id="montog" onclick="toggleMon()"></div>
+      </div>
+    </div>
+    <div class="scard">
+      <div class="sctitle">Schwellenwerte</div>
+      <div class="sr">
+        <div><div class="srl">Verspätung ab</div><div class="srs">Minuten bis zur Meldung</div></div>
+        <select class="finput" style="width:85px" id="delthresh" onchange="saveS()">
+          <option value="3">3 Min</option>
+          <option value="5" selected>5 Min</option>
+          <option value="10">10 Min</option>
+        </select>
+      </div>
+      <div class="sr">
+        <div><div class="srl">Normalisierung melden</div><div class="srs">Wenn Zug wieder pünktlich</div></div>
+        <div class="toggle on" id="normtog" onclick="toggleNorm()"></div>
+      </div>
+    </div>
+    <div class="scard">
+      <div class="sctitle">Daten</div>
+      <div class="sr">
+        <div><div class="srl">Alle Daten löschen</div><div class="srs">Favoriten &amp; Einstellungen</div></div>
+        <button class="sbtn sbtnr" onclick="nuke()">Löschen</button>
+      </div>
+      <div class="sr">
+        <div><div class="srl">Datenschutzerklärung</div><div class="srs">DSGVO · Einwilligungen verwalten</div></div>
+        <button class="sbtn" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);font-size:12px" onclick="switchToPrivacy()">Öffnen</button>
+      </div>
+    </div>
+    <div style="text-align:center;padding:16px 0 4px;font-family:var(--mono);font-size:9.5px;color:var(--text3);line-height:1.7">
+      BahnWatcher v1.1 · transport.rest API · ntfy.sh<br>Keine Kosten · Kein Account · Open Data
+    </div>
+  </div>
+  <!-- ═══════════════ DATENSCHUTZ ═══════════════ -->
+  <div class="page" id="page-privacy">
+    <div class="privacy-page">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+        <button onclick="switchTab('settings')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text2);cursor:pointer;font-family:var(--sans);font-size:13px">← Zurück</button>
+        <div class="slabel" style="margin:0">Datenschutzerklärung</div>
+      </div>
+
+      <div class="privacy-section">
+        <div class="privacy-h2">1. Verantwortliche Stelle</div>
+        <div class="privacy-p">BahnWatcher ist eine rein clientseitige Web-App. Es gibt keinen Betreiber-Server. Die App läuft vollständig in deinem Browser. Du selbst bist für die Daten auf deinem Gerät verantwortlich.</div>
+      </div>
+
+      <div class="privacy-section">
+        <div class="privacy-h2">2. Verarbeitete Daten</div>
+        <table class="privacy-table">
+          <tr><th>Datenkategorie</th><th>Zweck</th><th>Speicherort</th><th>Rechtsgrundlage</th></tr>
+          <tr><td>Favoriten &amp; Einstellungen</td><td>App-Funktion</td><td>Nur dein Gerät (localStorage)</td><td>Art. 6 I lit. b DSGVO</td></tr>
+          <tr><td>IP-Adresse</td><td>API-Abfragen (transport.rest)</td><td>transport.rest-Server (DE)</td><td>Art. 6 I lit. f DSGVO</td></tr>
+          <tr><td>Suchbegriffe / Haltestellen</td><td>Verbindungssuche</td><td>transport.rest (nur temporär)</td><td>Art. 6 I lit. a DSGVO</td></tr>
+          <tr><td>GPS-Koordinaten</td><td>Alternativensuche (optional)</td><td>Nur im RAM, nie gespeichert</td><td>Art. 6 I lit. a DSGVO</td></tr>
+          <tr><td>ntfy-Kanalname</td><td>Push-Benachrichtigung (optional)</td><td>Dein Gerät + ntfy.sh</td><td>Art. 6 I lit. a DSGVO</td></tr>
+        </table>
+      </div>
+
+      <div class="privacy-section">
+        <div class="privacy-h2">3. Drittanbieter</div>
+        <div class="privacy-p"><strong>transport.rest:</strong> Open-Source Bahn-API, betrieben von Jannis R. in Deutschland. Keine Registrierung, keine Cookies, kein Tracking. Anfragen enthalten nur deine IP und den Suchbegriff. <a href="https://transport.rest/imprint.html" target="_blank">Impressum &amp; Datenschutz ↗</a></div>
+        <div class="privacy-p"><strong>ntfy.sh (optional):</strong> Open-Source Push-Dienst. Nur aktiv wenn du einen Kanal konfiguriert hast. Betreiber: Philipp C. Heckel. EU-Server verfügbar. <a href="https://ntfy.sh/docs/privacy/" target="_blank">Datenschutz ntfy.sh ↗</a></div>
+        <div class="privacy-p"><strong>Google Fonts:</strong> Werden <strong>nicht</strong> verwendet. Die App verwendet ausschließlich Systemschriften, um keine Daten an Google zu übertragen (EuGH C-311/18).</div>
+      </div>
+
+      <div class="privacy-section">
+        <div class="privacy-h2">4. Deine Rechte</div>
+        <div class="privacy-p">Da alle Daten lokal in deinem Browser gespeichert werden, kannst du sie jederzeit über Einstellungen → "Alle Daten löschen" entfernen. GPS-Berechtigungen kannst du in deinem Browser verwalten.</div>
+      </div>
+
+      <div class="privacy-section">
+        <div class="privacy-h2">5. Einwilligung widerrufen</div>
+        <div class="privacy-p">Du kannst deine Einwilligung jederzeit widerrufen. Klicke dazu auf den Button unten – der Consent-Dialog wird erneut angezeigt und alle lokalen Daten werden gelöscht.</div>
+        <button onclick="revokeConsent()" style="padding:10px 18px;background:none;border:1px solid var(--red);border-radius:9px;color:var(--red);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer">Einwilligung widerrufen &amp; Daten löschen</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<nav class="bnav">
+  <button class="bni on" id="bn-favorites"    onclick="switchTab('favorites')"><span class="bnicon">⭐</span><span class="bnlbl">Favoriten</span></button>
+  <button class="bni"    id="bn-connections"  onclick="switchTab('connections')"><span class="bnicon">🔍</span><span class="bnlbl">Suchen</span></button>
+  <button class="bni"    id="bn-alternatives" onclick="switchTab('alternatives')"><span class="bnicon">🚶</span><span class="bnlbl">Alternativ</span></button>
+  <button class="bni"    id="bn-settings"     onclick="switchTab('settings')"><span class="bnicon">⚙️</span><span class="bnlbl">Einstell.</span></button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+
+// ═══════════════════════════════════════════════════════════
+//  PWA — SERVICE WORKER & INSTALL
+// ═══════════════════════════════════════════════════════════
+let deferredPrompt = null;
+
+// Register inline service worker via blob URL
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+
+  const swCode = `
+const CACHE = 'bahnwatcher-v1';
+const OFFLINE_ASSETS = []; // single file app, nothing extra to cache
+
+self.addEventListener('install', e => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', e => {
+  // Only cache same-origin requests (the app itself)
+  const url = new URL(e.request.url);
+  if (url.origin !== location.origin) {
+    // For API requests: network first, no cache (live data needed)
+    e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', {headers:{'Content-Type':'application/json'}})));
+    return;
+  }
+  // For the app itself: cache first
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      const network = fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      });
+      return cached || network;
+    })
+  );
+});
+`;
+
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+
+  navigator.serviceWorker.register(swUrl, { scope: './' })
+    .then(reg => {
+      console.log('SW registered:', reg.scope);
+    })
+    .catch(err => {
+      // Blob SW not supported in all contexts — silent fail is fine
+      console.log('SW not available in this context:', err.message);
+    });
+}
+
+// Listen for Android "Add to Home Screen" prompt
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show install banner if not dismissed before
+  if (!localStorage.getItem('bw_install_dismissed')) {
+    document.getElementById('install-banner').classList.add('visible');
+  }
+});
+
+// App was installed
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('visible');
+  deferredPrompt = null;
+  toast('✓ BahnWatcher installiert!');
+});
+
+function triggerInstall() {
+  if (!deferredPrompt) {
+    // Fallback instructions
+    showInstallInstructions();
+    return;
+  }
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(choice => {
+    deferredPrompt = null;
+    document.getElementById('install-banner').classList.remove('visible');
+  });
+}
+
+function dismissInstall() {
+  document.getElementById('install-banner').classList.remove('visible');
+  localStorage.setItem('bw_install_dismissed', '1');
+}
+
+function showInstallInstructions() {
+  // Detect browser
+  const ua = navigator.userAgent;
+  let msg = '';
+  if (/Chrome/i.test(ua) && /Android/i.test(ua)) {
+    msg = 'Chrome auf Android:\n1. Menü (⋮) oben rechts öffnen\n2. "Zum Startbildschirm hinzufügen" tippen\n3. Bestätigen';
+  } else if (/Firefox/i.test(ua)) {
+    msg = 'Firefox:\n1. Menü (⋮) öffnen\n2. "Zum Startbildschirm hinzufügen" wählen';
+  } else if (/Safari/i.test(ua)) {
+    msg = 'Safari (iOS):\n1. Teilen-Button (□↑) antippen\n2. "Zum Home-Bildschirm" wählen';
+  } else {
+    msg = 'Browser-Menü öffnen und\n"Zum Startbildschirm hinzufügen" wählen.';
+  }
+  alert('📲 BahnWatcher installieren\n\n' + msg);
+}
+
+// Check if already running as PWA
+function isPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DSGVO CONSENT
+// ═══════════════════════════════════════════════════════════
+let consent = { given: false, gps: false, ntfy: false };
+
+function loadConsent() {
+  try {
+    const c = localStorage.getItem('bw_consent');
+    if (c) consent = JSON.parse(c);
+  } catch(e) {}
+}
+
+function saveConsent() {
+  localStorage.setItem('bw_consent', JSON.stringify(consent));
+}
+
+function gdprAcceptAll() {
+  consent = { given: true, gps: true, ntfy: true };
+  saveConsent();
+  document.getElementById('gdpr-overlay').classList.add('hidden');
+  runApp();
+}
+
+function gdprAcceptSelected() {
+  consent.given = true;
+  consent.gps   = document.getElementById('gdpr-gps-toggle').classList.contains('on');
+  consent.ntfy  = document.getElementById('gdpr-ntfy-toggle').classList.contains('on');
+  saveConsent();
+  document.getElementById('gdpr-overlay').classList.add('hidden');
+  runApp();
+}
+
+function revokeConsent() {
+  if (!confirm('Einwilligung widerrufen und alle lokalen Daten löschen?')) return;
+  localStorage.clear();
+  consent = { given: false, gps: false, ntfy: false };
+  location.reload();
+}
+
+function switchToPrivacy() {
+  // Add privacy page to tabs temporarily
+  document.getElementById('gdpr-overlay').classList.add('hidden');
+  switchTab('privacy');
+}
+
+// GPS consent gate
+function requestGPS() {
+  if (!consent.gps) {
+    if (confirm('Für die Alternativensuche wird dein Standort benötigt.\n\nDarf BahnWatcher einmalig deinen Standort verwenden?')) {
+      consent.gps = true;
+      saveConsent();
+    } else {
+      toast('GPS-Zugriff verweigert. Bitte Haltestelle manuell eingeben.');
+      return;
+    }
+  }
+  getGPSInternal();
+}
+
+// ntfy consent gate — called when user tries to save ntfy channel
+function checkNtfyConsent() {
+  if (!consent.ntfy) {
+    toast('Bitte erst in den Einstellungen unter Datenschutz ntfy.sh aktivieren.');
+    return false;
+  }
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+const DEF={favorites:[],settings:{ntfyChannel:'',monitoring:false,delayThreshold:5,notifyNorm:true}};
+let S=JSON.parse(JSON.stringify(DEF));
+let favSt={};
+let monTimer=null;
+let acT={};
+let ttMode='dep'; // 'dep' | 'arr'
+
+// ═══════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════
+function boot(){
+  loadConsent();
+  if (!consent.given) {
+    document.getElementById('gdpr-overlay').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('gdpr-overlay').classList.add('hidden');
+  runApp();
+}
+
+function runApp(){
+  registerServiceWorker();
+  try{const r=localStorage.getItem('bw4');if(r)S=Object.assign({},DEF,JSON.parse(r));}catch(e){}
+  // set default datetime to now
+  const now=new Date();
+  now.setSeconds(0,0);
+  document.getElementById('cs-time').value=now.toISOString().slice(0,16);
+  applyS();
+  renderFavs();
+  if(S.settings.monitoring)startMon();
+  // close dropdowns on outside click
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('.acwrap'))document.querySelectorAll('.aclist').forEach(l=>l.classList.remove('open'));
+  });
+  // API health check
+  checkApi();
+}
+
+async function checkApi(){
+  try{
+    const r=await fetch('https://v6.db.transport.rest/locations?query=Frankfurt&results=1&stops=true&addresses=false&poi=false',{signal:AbortSignal.timeout(6000)});
+    if(r.ok){
+      console.log('API OK: v6.db.transport.rest');
+      return;
+    }
+  }catch(e){console.warn('v6 failed:',e.message);}
+  // Try v5
+  try{
+    const r=await fetch('https://v5.db.transport.rest/locations?query=Frankfurt&results=1',{signal:AbortSignal.timeout(6000)});
+    if(r.ok){activeApi='https://v5.db.transport.rest';console.log('API OK: v5');return;}
+  }catch(e){console.warn('v5 failed:',e.message);}
+  // Both failed — show warning
+  showApiWarning();
+}
+
+function showApiWarning(){
+  const el=document.getElementById('api-warning');
+  if(el)el.style.display='flex';
+}
+function persist(){localStorage.setItem('bw4',JSON.stringify(S));}
+function applyS(){
+  document.getElementById('ntfych').value=S.settings.ntfyChannel||'';
+  document.getElementById('delthresh').value=S.settings.delayThreshold||5;
+  tog('montog',S.settings.monitoring);
+  tog('normtog',S.settings.notifyNorm);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════════
+const TABS=['favorites','connections','alternatives','settings','privacy'];
+function switchTab(t){
+  TABS.forEach((x,i)=>{
+    document.getElementById('page-'+x)?.classList.toggle('on',x===t);
+    document.querySelectorAll('.tab')[i]?.classList.toggle('on',x===t);
+    document.getElementById('bn-'+x)?.classList.toggle('on',x===t);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  API  — tries multiple CORS-friendly endpoints
+// ═══════════════════════════════════════════════════════════
+// Endpoint candidates in priority order
+const APIS=[
+  'https://v6.db.transport.rest',
+  'https://v5.db.transport.rest',
+];
+let activeApi=APIS[0];
+
+async function apiFetch(path){
+  // Try each base URL until one works
+  for(const base of APIS){
+    try{
+      const r=await fetch(base+path,{headers:{'Accept':'application/json'}});
+      if(r.ok){
+        activeApi=base;
+        return await r.json();
+      }
+    }catch(e){
+      console.warn('API failed:',base+path,e.message);
+    }
+  }
+  return null;
+}
+
+async function apiSearchStations(q){
+  if(!q||q.length<2)return[];
+  const d=await apiFetch(`/locations?query=${encodeURIComponent(q)}&results=8&stops=true&addresses=false&poi=false`);
+  if(!d)return[];
+  const arr=Array.isArray(d)?d:[];
+  return arr.filter(x=>x.type==='stop'||x.type==='station').slice(0,7);
+}
+
+async function apiJourneys(fromId,toId,when,isArr=false){
+  const params=new URLSearchParams({
+    from:fromId,to:toId,
+    [isArr?'arrival':'departure']:when,
+    results:6,stopovers:false,language:'de'
+  });
+  const d=await apiFetch(`/journeys?${params}`);
+  return d?.journeys||[];
+}
+
+async function apiDepartures(stationId,mins=90){
+  const d=await apiFetch(`/stops/${stationId}/departures?when=${new Date().toISOString()}&duration=${mins}&results=20&language=de`);
+  if(!d)return[];
+  return d.departures||d||[];
+}
+
+async function apiNearby(lat,lon,dist=900){
+  const d=await apiFetch(`/stops/nearby?latitude=${lat}&longitude=${lon}&distance=${dist}&results=12`);
+  if(!d)return[];
+  return Array.isArray(d)?d:[];
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AUTOCOMPLETE — universal field handler
+// ═══════════════════════════════════════════════════════════
+// acField(inputId, acListId, hiddenIdField, hiddenNameField, isCoords=false)
+// isCoords=true: stores lat/lon instead of station ID
+function acField(inputId,acListId,hiddenId,hiddenName,isCoords=false){
+  const val=document.getElementById(inputId).value;
+  clearTimeout(acT[inputId]);
+  if(!val||val.length<2){
+    const el=document.getElementById(acListId);
+    el.classList.remove('open');return;
+  }
+  // Show loading
+  const el=document.getElementById(acListId);
+  el.innerHTML=`<div class="acloading"><div class="spin"></div> Suche…</div>`;
+  el.classList.add('open');
+  acT[inputId]=setTimeout(async()=>{
+    const res=await apiSearchStations(val);
+    if(!res.length){
+      el.innerHTML=`<div class="acloading" style="color:var(--text3)">
+        Keine Haltestellen gefunden.<br>
+        <small style="font-size:10px;opacity:.7">Tipp: Stelle sicher, dass du mit dem Internet verbunden bist.</small>
+      </div>`;
+      return;
+    }
+    el.innerHTML=res.map(s=>{
+      const products=Object.keys(s.products||{}).filter(k=>s.products[k]).slice(0,4);
+      const prodsHtml=products.map(p=>`<span class="acprod">${p.toUpperCase()}</span>`).join('');
+      const safeS=encodeURIComponent(JSON.stringify(s));
+      return `<div class="acitem" data-s="${safeS}">
+        <span class="acitem-icon">📍</span>
+        <div class="acitem-body">
+          <div class="acitem-name">${esc(s.name)}</div>
+          <div class="acitem-sub">${s.id||''}</div>
+          ${prodsHtml?`<div class="acitem-products">${prodsHtml}</div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+    // attach click handlers
+    el.querySelectorAll('.acitem').forEach(item=>{
+      item.addEventListener('click',()=>{
+        const s=JSON.parse(decodeURIComponent(item.dataset.s));
+        document.getElementById(inputId).value=s.name;
+        if(isCoords){
+          // store lat/lon separately for alternatives
+          document.getElementById('alt-lat').value=s.location?.latitude||'';
+          document.getElementById('alt-lon').value=s.location?.longitude||'';
+          document.getElementById('alt-sname').value=s.name;
+        } else {
+          document.getElementById(hiddenId).value=s.id||'';
+          document.getElementById(hiddenName).value=s.name;
+        }
+        el.classList.remove('open');
+      });
+    });
+  },320);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TIME TYPE TOGGLE
+// ═══════════════════════════════════════════════════════════
+function setTT(mode){
+  ttMode=mode;
+  document.getElementById('tt-dep').classList.toggle('on',mode==='dep');
+  document.getElementById('tt-arr').classList.toggle('on',mode==='arr');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CONNECTION SEARCH
+// ═══════════════════════════════════════════════════════════
+async function searchConnections(){
+  const fromId=document.getElementById('cs-from-id').value;
+  const toId=document.getElementById('cs-to-id').value;
+  const fromName=document.getElementById('cs-from-name').value||document.getElementById('cs-from').value;
+  const toName=document.getElementById('cs-to-name').value||document.getElementById('cs-to').value;
+  const timeVal=document.getElementById('cs-time').value;
+  const resEl=document.getElementById('conn-results');
+
+  if(!fromId){toast('Bitte Starthaltestelle aus der Liste wählen');return;}
+  if(!toId){toast('Bitte Zielhaltestelle aus der Liste wählen');return;}
+  if(!timeVal){toast('Bitte Zeit angeben');return;}
+
+  const when=new Date(timeVal).toISOString();
+  const isArr=ttMode==='arr';
+
+  const btn=document.getElementById('cs-search-btn');
+  btn.disabled=true;
+  btn.textContent='Suche läuft…';
+  resEl.innerHTML=`<div class="altload"><div class="spin"></div> Verbindungen werden gesucht…</div>`;
+
+  const journeys=await apiJourneys(fromId,toId,when,isArr);
+  btn.disabled=false;
+  btn.textContent='Verbindungen suchen';
+
+  if(!journeys.length){
+    resEl.innerHTML=`<div class="nores">Keine Verbindungen gefunden.<br><small>Andere Zeit oder Route versuchen.</small></div>`;
+    return;
+  }
+
+  resEl.innerHTML=`<div class="slabel" style="margin-top:4px">Gefundene Verbindungen</div>`
+    +journeys.map((j,idx)=>renderConnCard(j,idx,fromId,toId,fromName,toName)).join('');
+}
+
+function renderConnCard(j,idx,fromId,toId,fromName,toName){
+  const legs=j.legs||[];
+  if(!legs.length)return'';
+
+  const firstLeg=legs[0];
+  const lastLeg=legs[legs.length-1];
+
+  const depPlanned=firstLeg.plannedDeparture||firstLeg.departure;
+  const depReal=firstLeg.departure;
+  const arrPlanned=lastLeg.plannedArrival||lastLeg.arrival;
+  const arrReal=lastLeg.arrival;
+
+  const depDelay=firstLeg.departureDelay?Math.round(firstLeg.departureDelay/60):0;
+  const cancelled=firstLeg.cancelled||false;
+
+  const durMs=new Date(arrPlanned)-new Date(depPlanned);
+  const durMin=Math.round(durMs/60000);
+  const durH=Math.floor(durMin/60),durM=durMin%60;
+  const durStr=durH>0?`${durH}h ${durM}min`:`${durM} min`;
+
+  const changes=legs.filter(l=>l.line).length-1;
+
+  // build legs display
+  const legsHtml=legs.map(l=>{
+    if(l.walking)return`<span class="conn-leg walking">🚶 ~${Math.round((l.distance||400)/75)} min</span>`;
+    const name=l.line?.name||l.line?.fahrtNr||'?';
+    return`<span class="conn-leg">${esc(name)}</span>`;
+  }).join('');
+
+  // via stops
+  const viaStops=legs.filter(l=>l.line).map(l=>l.destination?.name||'').filter(Boolean);
+  const viaStr=viaStops.length>1?viaStops.slice(0,-1).join(' · '):'';
+
+  // real time display
+  let depRealHtml='';
+  if(cancelled){
+    depRealHtml=`<div class="conn-dep-real" style="color:var(--red)">Ausfall</div>`;
+  } else if(depDelay>=1){
+    depRealHtml=`<div class="conn-dep-real late">+${depDelay} Min · ${ft(depReal)}</div>`;
+  } else if(depReal){
+    depRealHtml=`<div class="conn-dep-real ok">pünktlich</div>`;
+  }
+
+  // default save name
+  const defName=`${fromName.split(' ')[0]} → ${toName.split(' ')[0]} ${ft(depPlanned)}`;
+
+  return`<div class="conn-card" id="conn-${idx}">
+    <div class="conn-top">
+      <div class="conn-times">
+        <div class="conn-dep">${ft(depPlanned)}</div>
+        ${depRealHtml}
+        <div class="conn-arr">an <strong>${ft(arrPlanned)}</strong></div>
+      </div>
+      <div class="conn-info">
+        <div class="conn-legs">${legsHtml}</div>
+        <div class="conn-dur">⏱ ${durStr}${changes>0?` · ${changes}× umsteigen`:' · Direktverbindung'}</div>
+        ${viaStr?`<div class="conn-via">via ${esc(viaStr)}</div>`:''}
+      </div>
+    </div>
+    <div class="conn-save-row">
+      <input class="conn-save-input" id="csname-${idx}" placeholder="Name für Favorit…" value="${esc(defName)}">
+      <button class="conn-save-btn" id="csbtn-${idx}" onclick="saveConnAsFav(${idx},'${esc(fromId)}','${esc(toId)}','${esc(fromName)}','${esc(toName)}','${esc(ft(depPlanned))}')">
+        ＋ Speichern
+      </button>
+    </div>
+  </div>`;
+}
+
+function saveConnAsFav(idx,fromId,toId,fromName,toName,depTime){
+  const nameEl=document.getElementById(`csname-${idx}`);
+  const btnEl=document.getElementById(`csbtn-${idx}`);
+  const name=nameEl?.value?.trim()||`${fromName} → ${toName}`;
+  if(!name){toast('Bitte Namen eingeben');return;}
+
+  // figure out monitoring window: ±30 min around departure time
+  const [h,m]=depTime.split(':').map(Number);
+  const fromMins=Math.max(0,h*60+m-30);
+  const toMins=Math.min(1439,h*60+m+10);
+  const pad=n=>String(n).padStart(2,'0');
+  const tf=`${pad(Math.floor(fromMins/60))}:${pad(fromMins%60)}`;
+  const tt=`${pad(Math.floor(toMins/60))}:${pad(toMins%60)}`;
+
+  S.favorites.push({
+    id:'fav_'+Date.now(),
+    name,fromId,fromName,toId,toName,
+    tf,tt,
+    days:[1,2,3,4,5] // default Mo-Fr, user can adjust later
+  });
+  persist();
+
+  if(btnEl){btnEl.textContent='✓ Gespeichert';btnEl.classList.add('saved');}
+  toast(`✓ "${name}" zu Favoriten hinzugefügt`);
+  renderFavs();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FAVORITES
+// ═══════════════════════════════════════════════════════════
+function renderFavs(){
+  const el=document.getElementById('favlist');
+  const mb=document.getElementById('monbar');
+  const on=S.settings.monitoring;
+  mb.innerHTML=`<div class="monbar ${on?'on':'off'}"><div class="mondot"></div>${on?'Monitoring aktiv – alle 2 Minuten':'Monitoring pausiert'}${on?`<span class="monr">${new Date().toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'})}</span>`:''}</div>`;
+
+  if(!S.favorites.length){
+    el.innerHTML=`<div class="empty"><div class="ei">🚉</div><div class="et">Noch keine Verbindungen</div><div class="es">Suche unter "Verbindungen" eine Strecke und speichere sie als Favorit.</div></div>`;
+    return;
+  }
+
+  const DN=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  el.innerHTML=S.favorites.map(fav=>{
+    const st=favSt[fav.id]||{type:'unknown'};
+    let sc='',pill='',nxt='';
+    if(st.type==='ok'){sc='';pill=`<span class="pill pok">● Pünktlich</span>`;if(st.next)nxt=`<div class="fnext">Nächste: <span class="nt">${st.next.t}</span> <span style="color:var(--text2)">→ ${esc(st.next.d)}</span>${st.next.p?` · Gl. <span class="nt">${st.next.p}</span>`:''}</div>`;}
+    else if(st.type==='delayed'){sc='sdel';pill=`<span class="pill pdel">⚠ +${st.delay} Min</span>`;if(st.next)nxt=`<div class="fnext"><span class="nt">${st.next.t}</span> <span class="nd">+${st.delay} Min</span> → ${esc(st.next.d)}</div>`;}
+    else if(st.type==='cancelled'){sc='scan';pill=`<span class="pill pcan">✕ Ausfall</span>`;if(st.next)nxt=`<div class="fnext"><span class="nc">Ausfall</span> · Nächster: <span class="nt">${st.next.t}</span></div>`;}
+    else{pill=`<span class="pill punk">– unbekannt</span>`;}
+    const days=(fav.days||[1,2,3,4,5]).map(d=>DN[d]).join('·');
+    return`<div class="fcard ${sc}">
+      <div class="ftop">
+        <div class="find"></div>
+        <div class="fbody">
+          <div class="fhead"><div class="ftitle">${esc(fav.name)}</div>${pill}</div>
+          <div class="froute"><strong>${esc(fav.fromName)}</strong><span class="rsep">→</span><strong>${esc(fav.toName)}</strong></div>
+          <div class="fchips"><span class="chip">⏰ ${fav.tf}–${fav.tt}</span><span class="chip">📅 ${days}</span></div>
+        </div>
+      </div>
+      ${nxt}
+      <div class="facts">
+        <button class="abtn" onclick="refreshFav('${fav.id}')">↻ Jetzt prüfen</button>
+        <button class="abtn alt" onclick="openAltForFav('${fav.id}')">🚶 Alternativen</button>
+        <button class="abtn del" onclick="delFav('${fav.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function delFav(id){
+  if(!confirm('Favorit entfernen?'))return;
+  S.favorites=S.favorites.filter(f=>f.id!==id);
+  delete favSt[id];persist();renderFavs();toast('Verbindung entfernt');
+}
+
+async function refreshFav(id){
+  const fav=S.favorites.find(f=>f.id===id);if(!fav)return;
+  toast('↻ Aktualisiere…');
+  const deps=await apiDepartures(fav.fromId,60);
+  updSt(fav,deps);renderFavs();
+}
+
+function updSt(fav,deps){
+  if(!deps.length){favSt[fav.id]={type:'unknown'};return;}
+  const now=new Date();
+  const up=deps.filter(d=>new Date(d.when||d.plannedWhen)>now);
+  if(!up.length){favSt[fav.id]={type:'unknown'};return;}
+  const next=up[0];
+  const delay=next.delay?Math.round(next.delay/60):0;
+  const thr=S.settings.delayThreshold||5;
+  const ni={t:ft(next.when||next.plannedWhen),d:next.direction||'–',p:next.plannedPlatform||next.platform||''};
+  if(next.cancelled){const nok=up.find(d=>!d.cancelled);favSt[fav.id]={type:'cancelled',next:{...ni,t:nok?ft(nok.when||nok.plannedWhen):'–'}};}
+  else if(delay>=thr){favSt[fav.id]={type:'delayed',delay,next:ni};}
+  else{favSt[fav.id]={type:'ok',next:ni};}
+}
+
+function openAltForFav(id){
+  const fav=S.favorites.find(f=>f.id===id);if(!fav)return;
+  document.getElementById('altin').value=fav.fromName;
+  document.getElementById('altdest').value=fav.toName;
+  document.getElementById('alt-lat').value='';
+  document.getElementById('alt-lon').value='';
+  apiSearchStations(fav.fromName).then(r=>{
+    if(r[0]){document.getElementById('alt-lat').value=r[0].location?.latitude||'';document.getElementById('alt-lon').value=r[0].location?.longitude||'';}
+  });
+  switchTab('alternatives');toast('Startpunkt: '+fav.fromName);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MONITORING
+// ═══════════════════════════════════════════════════════════
+function toggleMon(){S.settings.monitoring=!S.settings.monitoring;tog('montog',S.settings.monitoring);persist();S.settings.monitoring?(startMon(),toast('✓ Monitoring aktiviert')):(stopMon(),toast('Monitoring pausiert'));renderFavs();}
+function startMon(){if(monTimer)clearInterval(monTimer);runCycle();monTimer=setInterval(runCycle,2*60*1000);}
+function stopMon(){if(monTimer){clearInterval(monTimer);monTimer=null;}}
+async function runCycle(){
+  for(const fav of S.favorites){
+    if(!inWin(fav))continue;
+    const deps=await apiDepartures(fav.fromId,60);
+    const prev=favSt[fav.id]?.type;
+    updSt(fav,deps);
+    const cur=favSt[fav.id]?.type;
+    if(prev!==undefined&&prev!==cur){
+      if(cur==='cancelled')push(`🚫 Ausfall: ${fav.name}`,`${fav.fromName} → ${fav.toName} ausgefallen`);
+      else if(cur==='delayed')push(`⚠️ Verspätung: ${fav.name}`,`+${favSt[fav.id].delay} Min · ${fav.fromName}`);
+      else if(cur==='ok'&&S.settings.notifyNorm)push(`✅ Normal: ${fav.name}`,`${fav.fromName} wieder pünktlich`);
+    }
+  }
+  renderFavs();
+}
+function inWin(fav){
+  const now=new Date(),day=now.getDay();
+  if(!(fav.days||[]).includes(day))return false;
+  const[fh,fm]=(fav.tf||'00:00').split(':').map(Number);
+  const[th,tm]=(fav.tt||'23:59').split(':').map(Number);
+  const m=now.getHours()*60+now.getMinutes();
+  return m>=fh*60+fm&&m<=th*60+tm;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PUSH
+// ═══════════════════════════════════════════════════════════
+async function push(title,msg){
+  const ch=S.settings.ntfyChannel;if(!ch)return;
+  try{await fetch(`https://ntfy.sh/${ch}`,{method:'POST',headers:{'Title':title,'Content-Type':'text/plain'},body:msg});}catch(e){}
+}
+async function testPush(){
+  if(!consent.ntfy){toast('Bitte erst Datenschutz-Einwilligung für ntfy.sh erteilen (Einstellungen → Datenschutz)');return;}
+  const ch=document.getElementById('ntfych').value.trim();
+  if(!ch){toast('Bitte Kanal eingeben');return;}
+  S.settings.ntfyChannel=ch;persist();
+  await push('🧪 BahnWatcher Test','Push funktioniert! 🚆');
+  toast('✓ Test gesendet → '+ch);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════
+function saveS(){S.settings.ntfyChannel=document.getElementById('ntfych').value.trim();S.settings.delayThreshold=parseInt(document.getElementById('delthresh').value)||5;persist();}
+function toggleNorm(){S.settings.notifyNorm=!S.settings.notifyNorm;tog('normtog',S.settings.notifyNorm);persist();}
+function nuke(){if(!confirm('Alle Daten löschen?'))return;localStorage.removeItem('bw4');S=JSON.parse(JSON.stringify(DEF));favSt={};stopMon();applyS();renderFavs();toast('Alle Daten gelöscht');}
+function tog(id,on){document.getElementById(id)?.classList.toggle('on',!!on);}
+
+// ═══════════════════════════════════════════════════════════
+//  ALTERNATIVES
+// ═══════════════════════════════════════════════════════════
+async function getGPSInternal(){
+  if(!navigator.geolocation){toast('GPS nicht verfügbar');return;}
+  toast('📍 GPS wird ermittelt…');
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const{latitude:lat,longitude:lon}=pos.coords;
+    document.getElementById('alt-lat').value=lat;
+    document.getElementById('alt-lon').value=lon;
+    const stops=await apiNearby(lat,lon,300);
+    const name=stops[0]?.name||`${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    document.getElementById('altin').value=name;
+    toast('📍 '+name);
+  },()=>toast('GPS nicht verfügbar'));
+}
+
+async function searchAlts(){
+  let lat=parseFloat(document.getElementById('alt-lat').value);
+  let lon=parseFloat(document.getElementById('alt-lon').value);
+  const startName=document.getElementById('altin').value.trim();
+  const walkMax=parseInt(document.getElementById('altwalk').value);
+  const dest=document.getElementById('altdest').value.trim();
+  const resEl=document.getElementById('altres');
+  if(!startName){toast('Bitte Startpunkt eingeben');return;}
+  resEl.innerHTML=`<div class="altload"><div class="spin"></div> Suche Haltestellen im Umkreis…</div>`;
+  if(!lat||!lon){
+    const st=await apiSearchStations(startName);
+    if(!st.length){resEl.innerHTML=`<div class="nores">Startpunkt nicht gefunden.</div>`;return;}
+    lat=st[0].location?.latitude;lon=st[0].location?.longitude;
+    document.getElementById('alt-lat').value=lat;document.getElementById('alt-lon').value=lon;
+  }
+  if(!lat||!lon){resEl.innerHTML=`<div class="nores">Koordinaten nicht ermittelbar.</div>`;return;}
+  const SPM=75,maxDist=walkMax*SPM;
+  const nearby=await apiNearby(lat,lon,maxDist+100);
+  if(!nearby.length){resEl.innerHTML=`<div class="nores">Keine Haltestellen im Umkreis.</div>`;return;}
+  resEl.innerHTML=`<div class="altload"><div class="spin"></div> Prüfe ${nearby.length} Haltestellen…</div>`;
+  const now=new Date();
+  const results=await Promise.all(nearby.slice(0,8).map(async stop=>{
+    const dist=stop.distance||hav(lat,lon,stop.location?.latitude,stop.location?.longitude);
+    const walkMins=Math.round(dist/SPM);
+    const deps=await apiDepartures(stop.id,30);
+    const reachable=deps.filter(d=>{
+      if(d.cancelled)return false;
+      return((new Date(d.when||d.plannedWhen))-now)/60000>=(walkMins+2);
+    }).slice(0,3);
+    return{stop,dist,walkMins,deps:reachable};
+  }));
+  results.sort((a,b)=>a.walkMins-b.walkMins);
+  resEl.innerHTML=`<div class="altpanel">
+    <div class="aphead">
+      <span class="apicon">🚶</span>
+      <div><div class="aptitle">Erreichbare Haltestellen</div><div class="apsub">Max. ${walkMax} Min · ${results.length} geprüft${dest?' · Richtung: '+esc(dest):''}</div></div>
+      <button class="apclose" onclick="document.getElementById('altres').innerHTML=''">✕</button>
+    </div>
+    ${results.map(r=>renderAlt(r,walkMax,lat,lon)).join('')}
+  </div>`;
+}
+
+function renderAlt(r,walkMax,olat,olon){
+  const{stop,walkMins,deps}=r;
+  const lat2=stop.location?.latitude,lon2=stop.location?.longitude;
+  const murl=`https://www.google.com/maps/dir/?api=1&origin=${olat},${olon}&destination=${lat2},${lon2}&travelmode=walking`;
+  const cls=walkMins<=walkMax*.6?'ok':walkMins<=walkMax?'tight':'far';
+  const em=cls==='ok'?'🟢':cls==='tight'?'🟡':'🔴';
+  const now=new Date();
+  const depsH=deps.length?deps.map(d=>{
+    const t=ft(d.when||d.plannedWhen);
+    const mLeft=Math.round(((new Date(d.when||d.plannedWhen))-now)/60000);
+    const delay=d.delay?Math.round(d.delay/60):0;
+    const fl=mLeft>=r.walkMins+5?`<span class="af">✓ ${mLeft} Min</span>`:`<span class="ag">⚠ ${mLeft} Min</span>`;
+    return`<div class="adep"><span class="at">${t}</span><span class="al">${esc(d.line?.name||'?')}</span><span style="color:var(--text2);font-size:12px">${esc(d.direction||'–')}</span>${fl}${delay>0?`<span style="color:var(--yellow);font-size:10px">+${delay}</span>`:''}</div>`;
+  }).join(''):`<div class="anoconn">Keine erreichbaren Abfahrten</div>`;
+  return`<div class="aitem ${cls}">
+    <div class="awkwrap"><div class="awkc">${em}</div><div class="awktime">${walkMins} Min<br>${r.dist<1000?Math.round(r.dist)+'m':(r.dist/1000).toFixed(1)+'km'}</div></div>
+    <div class="abody"><div class="astation">${esc(stop.name)}</div>${depsH}</div>
+    <a href="${murl}" target="_blank" class="mapsbtn">🗺️<span class="mapslbl">Maps</span></a>
+  </div>`;
+}
+
+function hav(lat1,lon1,lat2,lon2){
+  if(!lat1||!lon1||!lat2||!lon2)return 9999;
+  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════
+function ft(iso){if(!iso)return'–';return new Date(iso).toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'});}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+let toastT;
+function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2800);}
+
+
+// Online/offline detection
+window.addEventListener('offline', () => {
+  document.getElementById('offline-dot').style.display = 'block';
+  toast('⚠️ Offline – gespeicherte Favoriten noch sichtbar');
+});
+window.addEventListener('online', () => {
+  document.getElementById('offline-dot').style.display = 'none';
+  toast('✓ Wieder online');
+});
+
+boot();
+</script>
+</body>
+</html>
