@@ -37,11 +37,13 @@ jobs:
 
       - name: Build Debug APK
         working-directory: android
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BahnWatcher-debug
+          name: BahnWatcher-v1.0.${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30

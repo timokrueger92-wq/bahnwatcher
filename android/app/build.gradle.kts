@@ -13,8 +13,9 @@ android {
         applicationId = "com.bahnwatcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        val buildNumber = (System.getenv("BUILD_NUMBER") ?: "1").toInt()
+        versionCode = buildNumber
+        versionName = "1.0.$buildNumber"
     }
 
     buildTypes {
