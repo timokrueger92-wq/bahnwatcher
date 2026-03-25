@@ -100,7 +100,6 @@ fun BahnWatcherApp() {
 @Composable
 fun ConsentScreen(vm: MainViewModel) {
     var gpsChecked by remember { mutableStateOf(false) }
-    var ntfyChecked by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -129,17 +128,18 @@ fun ConsentScreen(vm: MainViewModel) {
                 )
 
                 ConsentItem(
+                    checked = true,
+                    enabled = false,
+                    title = "Pflicht: Android-Benachrichtigungen",
+                    subtitle = "Für Zugstatus-Alerts bei aktivem Monitoring",
+                    onCheckedChange = {}
+                )
+
+                ConsentItem(
                     checked = gpsChecked,
                     title = "Optional: GPS / Standort",
                     subtitle = "Für die Alternativen-Suche (Haltestellen in der Nähe)",
                     onCheckedChange = { gpsChecked = it }
-                )
-
-                ConsentItem(
-                    checked = ntfyChecked,
-                    title = "Optional: Push via ntfy.sh",
-                    subtitle = "Benachrichtigungen über ntfy.sh (Server in den USA)",
-                    onCheckedChange = { ntfyChecked = it }
                 )
             }
         },
@@ -147,7 +147,7 @@ fun ConsentScreen(vm: MainViewModel) {
             Button(
                 onClick = {
                     scope.launch {
-                        vm.repo.updateConsent(given = true, gps = gpsChecked, ntfy = ntfyChecked)
+                        vm.repo.updateConsent(given = true, gps = gpsChecked)
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = BackgroundDark)

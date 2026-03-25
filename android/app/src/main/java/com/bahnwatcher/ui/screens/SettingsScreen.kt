@@ -11,18 +11,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bahnwatcher.data.repository.AppSettings
 import com.bahnwatcher.ui.theme.*
 import com.bahnwatcher.ui.viewmodel.MainViewModel
+import com.bahnwatcher.worker.MonitoringWorker
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
     val settings by vm.settings.collectAsState()
+    val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var ntfyInput by remember(settings.ntfyChannel) { mutableStateOf(settings.ntfyChannel) }
     var testSent by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
@@ -54,54 +56,39 @@ fun SettingsScreen(vm: MainViewModel) {
 
         // Push notifications
         SettingsSection(title = "Push-Benachrichtigungen") {
-            Text("ntfy.sh Kanal", color = OnSurfaceMuted, fontSize = 13.sp)
-            Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = ntfyInput,
-                    onValueChange = { ntfyInput = it },
-                    placeholder = { Text("mein-kanal", color = OnSurfaceMuted) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = OnSurface,
-                        unfocusedTextColor = OnSurface,
-                        focusedBorderColor = Cyan,
-                        unfocusedBorderColor = Border
-                    )
-                )
+                Icon(Icons.Default.NotificationsActive, contentDescription = null,
+                    tint = Success, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        vm.saveSettings(settings.copy(ntfyChannel = ntfyInput))
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
-                ) {
-                    Text("Speichern")
-                }
+                Text("Native Android-Benachrichtigungen aktiv",
+                    color = OnSurface, fontSize = 14.sp)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Bei Statusänderungen (Verspätung, Ausfall, Normalisierung) erscheinen " +
+                "Benachrichtigungen direkt im Android-Benachrichtigungsbereich.",
+                color = OnSurfaceMuted, fontSize = 13.sp, lineHeight = 18.sp
+            )
+            Spacer(Modifier.height(10.dp))
             OutlinedButton(
                 onClick = {
-                    if (ntfyInput.isNotBlank()) {
-                        vm.repo.sendPushNotification(
-                            ntfyInput, "BahnWatcher Test",
-                            "Push-Benachrichtigungen funktionieren!"
-                        )
-                        testSent = true
-                    }
+                    MonitoringWorker.sendNotification(
+                        context,
+                        "BahnWatcher Test",
+                        "Push-Benachrichtigungen funktionieren!"
+                    )
+                    testSent = true
                 },
-                enabled = ntfyInput.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
             ) {
                 Icon(Icons.Default.Send, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Test-Nachricht senden")
+                Text("Test-Benachrichtigung senden")
             }
             if (testSent) {
                 Spacer(Modifier.height(4.dp))
-                Text("Test gesendet! Prüfe ntfy.sh/${ntfyInput}",
+                Text("Test gesendet! Sieh in den Benachrichtigungen nach.",
                     color = Success, fontSize = 12.sp)
             }
         }
@@ -169,7 +156,7 @@ fun SettingsScreen(vm: MainViewModel) {
         SettingsSection(title = "Datenverwaltung") {
             Text(
                 "BahnWatcher speichert Favoriten und Einstellungen lokal auf diesem Gerät. " +
-                "Es werden keine Daten an Dritte übermittelt (außer an transport.rest API und ggf. ntfy.sh).",
+                "Es werden keine Daten an Dritte übermittelt (außer an die transport.rest API).",
                 color = OnSurfaceMuted, fontSize = 13.sp, lineHeight = 18.sp
             )
             Spacer(Modifier.height(12.dp))
@@ -189,12 +176,12 @@ fun SettingsScreen(vm: MainViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 InfoChip("Version 1.0")
                 InfoChip("transport.rest API")
-                InfoChip("ntfy.sh")
+                InfoChip("Android Notifications")
             }
             Spacer(Modifier.height(8.dp))
             Text("Echtzeit-Bahndaten: transport.rest (FOSS)",
                 color = OnSurfaceMuted, fontSize = 12.sp)
-            Text("Push-Nachrichten: ntfy.sh (FOSS)",
+            Text("Push-Benachrichtigungen: native Android-API",
                 color = OnSurfaceMuted, fontSize = 12.sp)
         }
 

@@ -9,9 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.bahnwatcher.data.model.Favorite
-import com.bahnwatcher.data.repository.AppSettings
 import com.bahnwatcher.data.repository.BahnRepository
-import com.bahnwatcher.data.repository.PrefKeys
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.LocalTime
@@ -55,6 +53,19 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
             val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             mgr.createNotificationChannel(channel)
         }
+
+        fun sendNotification(context: Context, title: String, message: String) {
+            createNotificationChannel(context)
+            val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .build()
+            mgr.notify(System.currentTimeMillis().toInt(), notification)
+        }
     }
 
     override suspend fun doWork(): Result {
@@ -89,10 +100,7 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
             }
 
             message?.let {
-                sendLocalNotification(fav.name, it)
-                if (settings.ntfyChannel.isNotEmpty() && settings.consentNtfy) {
-                    repo.sendPushNotification(settings.ntfyChannel, fav.name, it)
-                }
+                sendNotification(applicationContext, fav.name, it)
             }
 
             repo.updateFavorite(
@@ -121,20 +129,6 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
         return now.isAfter(windowStart) && now.isBefore(windowEnd)
     }
 
-    private fun sendLocalNotification(title: String, message: String) {
-        val mgr = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        createNotificationChannel(applicationContext)
-
-        val notification = NotificationCompat.Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .build()
-
-        mgr.notify(System.currentTimeMillis().toInt(), notification)
-    }
 }
 
 class BootReceiver : BroadcastReceiver() {

@@ -3,7 +3,6 @@ package com.bahnwatcher.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
-import com.bahnwatcher.data.api.NtfyClient
 import com.bahnwatcher.data.api.TransportApiClient
 import com.bahnwatcher.data.db.AppDatabase
 import com.bahnwatcher.data.model.*
@@ -18,23 +17,19 @@ import kotlin.math.*
 val Context.dataStore by preferencesDataStore(name = "settings")
 
 object PrefKeys {
-    val NTFY_CHANNEL = stringPreferencesKey("ntfy_channel")
     val MONITORING = booleanPreferencesKey("monitoring")
     val DELAY_THRESHOLD = intPreferencesKey("delay_threshold")
     val NOTIFY_NORM = booleanPreferencesKey("notify_norm")
     val CONSENT_GIVEN = booleanPreferencesKey("consent_given")
     val CONSENT_GPS = booleanPreferencesKey("consent_gps")
-    val CONSENT_NTFY = booleanPreferencesKey("consent_ntfy")
 }
 
 data class AppSettings(
-    val ntfyChannel: String = "",
     val monitoring: Boolean = false,
     val delayThreshold: Int = 5,
     val notifyNorm: Boolean = true,
     val consentGiven: Boolean = false,
-    val consentGps: Boolean = false,
-    val consentNtfy: Boolean = false
+    val consentGps: Boolean = false
 )
 
 class BahnRepository(private val context: Context) {
@@ -57,33 +52,28 @@ class BahnRepository(private val context: Context) {
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
         AppSettings(
-            ntfyChannel = prefs[PrefKeys.NTFY_CHANNEL] ?: "",
             monitoring = prefs[PrefKeys.MONITORING] ?: false,
             delayThreshold = prefs[PrefKeys.DELAY_THRESHOLD] ?: 5,
             notifyNorm = prefs[PrefKeys.NOTIFY_NORM] ?: true,
             consentGiven = prefs[PrefKeys.CONSENT_GIVEN] ?: false,
-            consentGps = prefs[PrefKeys.CONSENT_GPS] ?: false,
-            consentNtfy = prefs[PrefKeys.CONSENT_NTFY] ?: false
+            consentGps = prefs[PrefKeys.CONSENT_GPS] ?: false
         )
     }
 
     suspend fun saveSettings(settings: AppSettings) {
         context.dataStore.edit { prefs ->
-            prefs[PrefKeys.NTFY_CHANNEL] = settings.ntfyChannel
             prefs[PrefKeys.MONITORING] = settings.monitoring
             prefs[PrefKeys.DELAY_THRESHOLD] = settings.delayThreshold
             prefs[PrefKeys.NOTIFY_NORM] = settings.notifyNorm
             prefs[PrefKeys.CONSENT_GIVEN] = settings.consentGiven
             prefs[PrefKeys.CONSENT_GPS] = settings.consentGps
-            prefs[PrefKeys.CONSENT_NTFY] = settings.consentNtfy
         }
     }
 
-    suspend fun updateConsent(given: Boolean, gps: Boolean, ntfy: Boolean) {
+    suspend fun updateConsent(given: Boolean, gps: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[PrefKeys.CONSENT_GIVEN] = given
             prefs[PrefKeys.CONSENT_GPS] = gps
-            prefs[PrefKeys.CONSENT_NTFY] = ntfy
         }
     }
 
@@ -188,10 +178,6 @@ class BahnRepository(private val context: Context) {
         val nextDep = dep.`when` ?: dep.plannedWhen ?: ""
 
         return FavoriteStatus(fav.id, status, delayMin, platform, formatTime(nextDep))
-    }
-
-    fun sendPushNotification(channel: String, title: String, message: String) {
-        NtfyClient.send(channel, title, message)
     }
 
     // ---- Helpers ----

@@ -75,24 +75,3 @@ object TransportApiClient {
         .create(TransportApiService::class.java)
 }
 
-// ntfy.sh notification sender
-object NtfyClient {
-    private val client = OkHttpClient()
-
-    fun send(channel: String, title: String, message: String) {
-        if (channel.isBlank()) return
-        try {
-            val body = okhttp3.RequestBody.create(
-                okhttp3.MediaType.parse("text/plain"),
-                message
-            )
-            val request = okhttp3.Request.Builder()
-                .url("https://ntfy.sh/$channel")
-                .post(body)
-                .addHeader("Title", title)
-                .addHeader("Tags", "train,de")
-                .build()
-            client.newCall(request).execute().close()
-        } catch (_: Exception) {}
-    }
-}
