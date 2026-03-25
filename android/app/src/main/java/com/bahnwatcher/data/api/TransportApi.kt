@@ -11,6 +11,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.QueryMap
 import java.util.concurrent.TimeUnit
 
 interface TransportApiService {
@@ -27,7 +28,8 @@ interface TransportApiService {
         @Query("departure") departure: String? = null,
         @Query("arrival") arrival: String? = null,
         @Query("results") results: Int = 5,
-        @Query("stopovers") stopovers: Boolean = false
+        @Query("stopovers") stopovers: Boolean = false,
+        @QueryMap(encoded = false) products: Map<String, String> = emptyMap()
     ): JourneysResponse
 
     @GET("stops/{id}/departures")

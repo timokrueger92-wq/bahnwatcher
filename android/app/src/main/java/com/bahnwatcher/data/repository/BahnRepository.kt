@@ -96,12 +96,24 @@ class BahnRepository(private val context: Context) {
         fromId: String,
         toId: String,
         isoDateTime: String,
-        isDeparture: Boolean
+        isDeparture: Boolean,
+        results: Int = 5,
+        includeLongDistance: Boolean = true
     ): List<JourneyUi> {
+        // transport.rest products filter: exclude nationalExpress (ICE) and national (IC/EC)
+        val products = if (!includeLongDistance) {
+            mapOf(
+                "products[nationalExpress]" to "false",
+                "products[national]" to "false"
+            )
+        } else emptyMap()
+
         val response = if (isDeparture) {
-            api.getJourneys(from = fromId, to = toId, departure = isoDateTime)
+            api.getJourneys(from = fromId, to = toId, departure = isoDateTime,
+                results = results, products = products)
         } else {
-            api.getJourneys(from = fromId, to = toId, arrival = isoDateTime)
+            api.getJourneys(from = fromId, to = toId, arrival = isoDateTime,
+                results = results, products = products)
         }
         return response.journeys?.mapNotNull { journey ->
             val legs = journey.legs ?: return@mapNotNull null

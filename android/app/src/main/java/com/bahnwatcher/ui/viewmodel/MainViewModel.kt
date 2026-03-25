@@ -40,8 +40,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchLoading = MutableStateFlow(false)
     val searchLoading = _searchLoading.asStateFlow()
 
+    private val _loadingMore = MutableStateFlow(false)
+    val loadingMore = _loadingMore.asStateFlow()
+
     private val _searchError = MutableStateFlow<String?>(null)
     val searchError = _searchError.asStateFlow()
+
+    // current search params – needed for "load more"
+    private var lastDateTime: LocalDateTime = LocalDateTime.now()
+    private var lastIsDeparture: Boolean = true
+    private var lastResults: Int = 5
+
+    val includeLongDistance = MutableStateFlow(true)
 
     // ---- Favorites status ----
     private val _favoriteStatuses = MutableStateFlow<Map<String, FavoriteStatus>>(emptyMap())
@@ -98,18 +108,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val fromId = from.id ?: return
         val toId = to.id ?: return
 
+        lastDateTime = dateTime
+        lastIsDeparture = isDeparture
+        lastResults = 5
+
         viewModelScope.launch {
             _searchLoading.value = true
             _searchError.value = null
+            _journeys.value = emptyList()
             try {
                 val iso = dateTime.atZone(ZoneId.systemDefault()).toInstant().toString()
-                val results = repo.searchJourneys(fromId, toId, iso, isDeparture)
+                val results = repo.searchJourneys(
+                    fromId, toId, iso, isDeparture,
+                    results = lastResults,
+                    includeLongDistance = includeLongDistance.value
+                )
                 _journeys.value = results
                 if (results.isEmpty()) _searchError.value = "Keine Verbindungen gefunden."
             } catch (e: Exception) {
                 _searchError.value = "Fehler: ${e.message}"
             } finally {
                 _searchLoading.value = false
+            }
+        }
+    }
+
+    fun loadMoreJourneys() {
+        val from = _fromStation.value ?: return
+        val to = _toStation.value ?: return
+        val fromId = from.id ?: return
+        val toId = to.id ?: return
+
+        lastResults += 5
+
+        viewModelScope.launch {
+            _loadingMore.value = true
+            try {
+                val iso = lastDateTime.atZone(ZoneId.systemDefault()).toInstant().toString()
+                val results = repo.searchJourneys(
+                    fromId, toId, iso, lastIsDeparture,
+                    results = lastResults,
+                    includeLongDistance = includeLongDistance.value
+                )
+                _journeys.value = results
+            } catch (e: Exception) {
+                _searchError.value = "Fehler: ${e.message}"
+            } finally {
+                _loadingMore.value = false
             }
         }
     }

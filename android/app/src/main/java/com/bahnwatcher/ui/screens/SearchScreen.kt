@@ -29,7 +29,9 @@ fun SearchScreen(vm: MainViewModel) {
     val suggestions by vm.stationSuggestions.collectAsState()
     val journeys by vm.journeys.collectAsState()
     val loading by vm.searchLoading.collectAsState()
+    val loadingMore by vm.loadingMore.collectAsState()
     val error by vm.searchError.collectAsState()
+    val includeLongDistance by vm.includeLongDistance.collectAsState()
 
     var fromQuery by remember { mutableStateOf(fromStation?.name ?: "") }
     var toQuery by remember { mutableStateOf(toStation?.name ?: "") }
@@ -138,6 +140,41 @@ fun SearchScreen(vm: MainViewModel) {
                 )
             }
 
+            Spacer(Modifier.height(6.dp))
+
+            // Fernverkehr toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Train,
+                        contentDescription = null,
+                        tint = if (includeLongDistance) Cyan else OnSurfaceMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Column {
+                        Text("Fernverkehr (ICE/IC/EC)",
+                            color = OnSurface, fontSize = 13.sp)
+                        Text(
+                            if (includeLongDistance) "wird berücksichtigt" else "wird ausgeblendet",
+                            color = OnSurfaceMuted, fontSize = 11.sp
+                        )
+                    }
+                }
+                Switch(
+                    checked = includeLongDistance,
+                    onCheckedChange = { vm.includeLongDistance.value = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Cyan,
+                        checkedTrackColor = Cyan.copy(alpha = 0.3f)
+                    )
+                )
+            }
+
             Spacer(Modifier.height(8.dp))
             DateTimeRow(dateTime = dateTime, onChange = { dateTime = it })
 
@@ -168,6 +205,32 @@ fun SearchScreen(vm: MainViewModel) {
         ) {
             items(journeys) { journey ->
                 JourneyCard(journey = journey, onSave = { savingJourney = journey })
+            }
+
+            if (journeys.isNotEmpty()) {
+                item {
+                    OutlinedButton(
+                        onClick = { vm.loadMoreJourneys() },
+                        enabled = !loadingMore,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
+                    ) {
+                        if (loadingMore) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Cyan
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        } else {
+                            Icon(Icons.Default.ExpandMore, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text("Mehr Verbindungen laden", fontSize = 14.sp)
+                    }
+                }
             }
         }
     }
