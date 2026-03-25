@@ -1,0 +1,6 @@
+-keep class com.bahnwatcher.data.model.** { *; }
+-keep class com.bahnwatcher.data.api.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
