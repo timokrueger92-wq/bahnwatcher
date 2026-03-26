@@ -88,8 +88,9 @@ fun BahnWatcherApp() {
 
     val pendingFavoriteId by vm.pendingFavoriteId.collectAsState()
     val pendingOpenSearch by vm.pendingOpenSearch.collectAsState()
+    val pendingAlternativeSearch by vm.pendingAlternativeSearch.collectAsState()
 
-    // Navigate to the right tab when a notification deep-link arrives
+    // Navigate to the right tab when a notification deep-link or dialog button triggers it
     LaunchedEffect(pendingFavoriteId) {
         if (pendingFavoriteId != null) selectedRoute = "favorites"
     }
@@ -97,6 +98,11 @@ fun BahnWatcherApp() {
         if (pendingOpenSearch) {
             selectedRoute = "search"
             vm.clearPendingSearch()
+        }
+    }
+    LaunchedEffect(pendingAlternativeSearch) {
+        if (pendingAlternativeSearch) {
+            selectedRoute = "alternatives"
         }
     }
 

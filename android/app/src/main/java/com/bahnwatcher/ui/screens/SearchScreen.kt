@@ -582,58 +582,98 @@ fun JourneyLegsDetail(legs: List<Leg>) {
 fun TrainLegRow(leg: Leg) {
     val depTime = formatLegTime(leg.departure ?: leg.plannedDeparture)
     val arrTime = formatLegTime(leg.arrival ?: leg.plannedArrival)
-    val delay = leg.departureDelay ?: 0
+    val depDelay = (leg.departureDelay ?: 0) / 60
+    val arrDelay = (leg.arrivalDelay ?: 0) / 60
+    val cancelled = leg.cancelled == true
+    val platform = leg.platform ?: leg.plannedPlatform
+
+    val statusColor = when {
+        cancelled -> Error
+        depDelay > 5 -> Error
+        depDelay > 0 -> Warning
+        else -> Success
+    }
+    val statusText = when {
+        cancelled -> "Ausf."
+        depDelay > 0 -> "+${depDelay}'"
+        else -> "✓"
+    }
+    val lineColor = if (cancelled) Error else Cyan
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Timeline: dot → line → dot
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(8.dp).padding(top = 3.dp)
+        ) {
+            Box(modifier = Modifier.size(7.dp).background(statusColor, RoundedCornerShape(50)))
+            Box(modifier = Modifier.width(2.dp).height(36.dp).background(Border))
+            Box(modifier = Modifier.size(7.dp).background(statusColor, RoundedCornerShape(50)))
+        }
+
+        // Line badge
         Surface(
-            color = Cyan.copy(alpha = 0.15f),
+            color = lineColor.copy(alpha = 0.15f),
             shape = RoundedCornerShape(4.dp),
-            modifier = Modifier.padding(top = 2.dp)
+            modifier = Modifier.padding(top = 1.dp)
         ) {
             Text(
                 leg.line?.name ?: "?",
-                color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                color = lineColor, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
+
         Column(modifier = Modifier.weight(1f)) {
+            // Departure
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(depTime, color = OnSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                if (delay > 0) {
+                Text(depTime,
+                    color = if (cancelled) Error else OnSurface,
+                    fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                if (depDelay > 0 && !cancelled) {
                     Spacer(Modifier.width(4.dp))
-                    Text("+${delay}'", color = Warning, fontSize = 11.sp)
+                    Text("+${depDelay}'", color = Warning, fontSize = 11.sp)
                 }
                 Spacer(Modifier.width(6.dp))
-                Text(
-                    leg.origin?.name ?: "",
-                    color = OnSurfaceMuted, fontSize = 12.sp,
+                Text(leg.origin?.name ?: "", color = OnSurfaceMuted, fontSize = 12.sp,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                    modifier = Modifier.weight(1f))
             }
+            // Direction + platform
             if (!leg.direction.isNullOrBlank()) {
-                Text("→ ${leg.direction}",
-                    color = OnSurfaceMuted, fontSize = 11.sp,
+                Text("→ ${leg.direction}", color = OnSurfaceMuted, fontSize = 11.sp,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
+            if (!platform.isNullOrBlank()) {
+                Text("Gleis $platform", color = Cyan, fontSize = 11.sp)
+            }
+            // Arrival
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(arrTime, color = OnSurface, fontSize = 13.sp)
+                Text(arrTime,
+                    color = if (cancelled) Error else OnSurface,
+                    fontSize = 13.sp)
+                if (arrDelay > 0 && !cancelled) {
+                    Spacer(Modifier.width(4.dp))
+                    Text("+${arrDelay}'", color = Warning, fontSize = 11.sp)
+                }
                 Spacer(Modifier.width(6.dp))
-                Text(
-                    leg.destination?.name ?: "",
-                    color = OnSurfaceMuted, fontSize = 12.sp,
+                Text(leg.destination?.name ?: "", color = OnSurfaceMuted, fontSize = 12.sp,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                    modifier = Modifier.weight(1f))
             }
+        }
+
+        // Status badge
+        Surface(color = statusColor.copy(alpha = 0.15f), shape = RoundedCornerShape(4.dp)) {
+            Text(statusText, color = statusColor, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
         }
     }
 }
