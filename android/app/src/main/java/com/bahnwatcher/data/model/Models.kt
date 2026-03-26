@@ -60,7 +60,9 @@ data class Leg(
     val line: Line?,
     val direction: String?,
     val platform: String?,
-    val plannedPlatform: String?
+    val plannedPlatform: String?,
+    val departurePlatform: String?,
+    val plannedDeparturePlatform: String?
 )
 
 data class Line(

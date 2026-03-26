@@ -29,7 +29,9 @@ interface TransportApiService {
         @Query("arrival") arrival: String? = null,
         @Query("results") results: Int = 5,
         @Query("stopovers") stopovers: Boolean = false,
-        @QueryMap(encoded = false) products: Map<String, String> = emptyMap()
+        // Product filters – passed as flat boolean params (transport.rest v6 style)
+        @Query("nationalExpress") nationalExpress: Boolean? = null,
+        @Query("national") national: Boolean? = null
     ): JourneysResponse
 
     @GET("stops/{id}/departures")
@@ -63,8 +65,8 @@ object TransportApiClient {
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
     val service: TransportApiService = Retrofit.Builder()

@@ -55,175 +55,176 @@ fun SearchScreen(vm: MainViewModel) {
     LaunchedEffect(fromStation) { fromStation?.name?.let { fromQuery = it } }
     LaunchedEffect(toStation) { toStation?.name?.let { toQuery = it } }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(BackgroundDark),
+        contentPadding = PaddingValues(horizontal = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Verbindungen", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = OnSurface)
-            Spacer(Modifier.height(16.dp))
+        // ---- Search controls (fixed header area) ----
+        item(key = "controls") {
+            Column(modifier = Modifier.padding(top = 16.dp)) {
+                Text("Verbindungen", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = OnSurface)
+                Spacer(Modifier.height(16.dp))
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    StationField(
-                        label = "Von",
-                        value = fromQuery,
-                        icon = Icons.Default.TripOrigin,
-                        suggestions = if (activeField == "from") suggestions else emptyList(),
-                        isActive = activeField == "from",
-                        onValueChange = {
-                            fromQuery = it
-                            activeField = "from"
-                            vm.searchStations(it)
-                        },
-                        onClear = { fromQuery = ""; vm.clearSuggestions() },
-                        onSuggestionSelected = { stop ->
-                            fromQuery = stop.name ?: ""
-                            vm.setFromStation(stop)
-                            activeField = null
-                        },
-                        onDismissSuggestions = { activeField = null }
-                    )
-                    HorizontalDivider(color = Border, modifier = Modifier.padding(vertical = 8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         StationField(
-                            label = "Nach",
-                            value = toQuery,
-                            icon = Icons.Default.Place,
-                            suggestions = if (activeField == "to") suggestions else emptyList(),
-                            isActive = activeField == "to",
+                            label = "Von",
+                            value = fromQuery,
+                            icon = Icons.Default.TripOrigin,
+                            suggestions = if (activeField == "from") suggestions else emptyList(),
+                            isActive = activeField == "from",
                             onValueChange = {
-                                toQuery = it
-                                activeField = "to"
+                                fromQuery = it
+                                activeField = "from"
                                 vm.searchStations(it)
                             },
-                            onClear = { toQuery = ""; vm.clearSuggestions() },
+                            onClear = { fromQuery = ""; vm.clearSuggestions() },
                             onSuggestionSelected = { stop ->
-                                toQuery = stop.name ?: ""
-                                vm.setToStation(stop)
+                                fromQuery = stop.name ?: ""
+                                vm.setFromStation(stop)
                                 activeField = null
                             },
-                            onDismissSuggestions = { activeField = null },
-                            modifier = Modifier.weight(1f)
+                            onDismissSuggestions = { activeField = null }
                         )
-                        IconButton(onClick = {
-                            vm.swapStations()
-                            val tmp = fromQuery; fromQuery = toQuery; toQuery = tmp
-                        }) {
-                            Icon(Icons.Default.SwapVert, contentDescription = "Tauschen", tint = Cyan)
+                        HorizontalDivider(color = Border, modifier = Modifier.padding(vertical = 8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StationField(
+                                label = "Nach",
+                                value = toQuery,
+                                icon = Icons.Default.Place,
+                                suggestions = if (activeField == "to") suggestions else emptyList(),
+                                isActive = activeField == "to",
+                                onValueChange = {
+                                    toQuery = it
+                                    activeField = "to"
+                                    vm.searchStations(it)
+                                },
+                                onClear = { toQuery = ""; vm.clearSuggestions() },
+                                onSuggestionSelected = { stop ->
+                                    toQuery = stop.name ?: ""
+                                    vm.setToStation(stop)
+                                    activeField = null
+                                },
+                                onDismissSuggestions = { activeField = null },
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = {
+                                vm.swapStations()
+                                val tmp = fromQuery; fromQuery = toQuery; toQuery = tmp
+                            }) {
+                                Icon(Icons.Default.SwapVert, contentDescription = "Tauschen", tint = Cyan)
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = isDeparture,
-                    onClick = { isDeparture = true },
-                    label = { Text("Abfahrt", fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Cyan.copy(alpha = 0.2f),
-                        selectedLabelColor = Cyan
-                    )
-                )
-                FilterChip(
-                    selected = !isDeparture,
-                    onClick = { isDeparture = false },
-                    label = { Text("Ankunft", fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Cyan.copy(alpha = 0.2f),
-                        selectedLabelColor = Cyan
-                    )
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Train,
-                        contentDescription = null,
-                        tint = if (includeLongDistance) Cyan else OnSurfaceMuted,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Column {
-                        Text("Fernverkehr (ICE/IC/EC)", color = OnSurface, fontSize = 13.sp)
-                        Text(
-                            if (includeLongDistance) "wird berücksichtigt" else "wird ausgeblendet",
-                            color = OnSurfaceMuted, fontSize = 11.sp
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = isDeparture,
+                        onClick = { isDeparture = true },
+                        label = { Text("Abfahrt", fontSize = 13.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Cyan.copy(alpha = 0.2f),
+                            selectedLabelColor = Cyan
                         )
-                    }
-                }
-                Switch(
-                    checked = includeLongDistance,
-                    onCheckedChange = { vm.includeLongDistance.value = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Cyan,
-                        checkedTrackColor = Cyan.copy(alpha = 0.3f)
                     )
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-            DateTimeRow(dateTime = dateTime, onChange = { dateTime = it })
-
-            Spacer(Modifier.height(12.dp))
-
-            Button(
-                onClick = { vm.searchJourneys(dateTime, isDeparture) },
-                enabled = fromStation != null && toStation != null && !loading,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = BackgroundDark)
-            ) {
-                if (loading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = BackgroundDark)
-                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = !isDeparture,
+                        onClick = { isDeparture = false },
+                        label = { Text("Ankunft", fontSize = 13.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Cyan.copy(alpha = 0.2f),
+                            selectedLabelColor = Cyan
+                        )
+                    )
                 }
-                Text("Verbindungen suchen", fontWeight = FontWeight.SemiBold)
-            }
-        }
 
-        error?.let {
-            Text(it, color = Error, modifier = Modifier.padding(horizontal = 16.dp))
-        }
+                Spacer(Modifier.height(6.dp))
 
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(journeys) { journey ->
-                JourneyCard(journey = journey, onSave = { savingJourney = journey })
-            }
-
-            if (journeys.isNotEmpty()) {
-                item {
-                    OutlinedButton(
-                        onClick = { vm.loadMoreJourneys() },
-                        enabled = !loadingMore,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
-                    ) {
-                        if (loadingMore) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Cyan)
-                            Spacer(Modifier.width(8.dp))
-                        } else {
-                            Icon(Icons.Default.ExpandMore, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Train,
+                            contentDescription = null,
+                            tint = if (includeLongDistance) Cyan else OnSurfaceMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Column {
+                            Text("Fernverkehr (ICE/IC/EC)", color = OnSurface, fontSize = 13.sp)
+                            Text(
+                                if (includeLongDistance) "wird berücksichtigt" else "wird ausgeblendet",
+                                color = OnSurfaceMuted, fontSize = 11.sp
+                            )
                         }
-                        Text("Mehr Verbindungen laden", fontSize = 14.sp)
                     }
+                    Switch(
+                        checked = includeLongDistance,
+                        onCheckedChange = { vm.includeLongDistance.value = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Cyan,
+                            checkedTrackColor = Cyan.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+                DateTimeRow(dateTime = dateTime, onChange = { dateTime = it })
+                Spacer(Modifier.height(12.dp))
+
+                Button(
+                    onClick = { vm.searchJourneys(dateTime, isDeparture) },
+                    enabled = fromStation != null && toStation != null && !loading,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = BackgroundDark)
+                ) {
+                    if (loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = BackgroundDark)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text("Verbindungen suchen", fontWeight = FontWeight.SemiBold)
+                }
+
+                error?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, color = Error, fontSize = 13.sp)
+                }
+            }
+        }
+
+        // ---- Journey results ----
+        items(journeys, key = { it.departure + it.arrival + it.from }) { journey ->
+            JourneyCard(journey = journey, onSave = { savingJourney = journey })
+        }
+
+        if (journeys.isNotEmpty()) {
+            item(key = "load_more") {
+                OutlinedButton(
+                    onClick = { vm.loadMoreJourneys() },
+                    enabled = !loadingMore,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
+                ) {
+                    if (loadingMore) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Cyan)
+                        Spacer(Modifier.width(8.dp))
+                    } else {
+                        Icon(Icons.Default.ExpandMore, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text("Mehr Verbindungen laden", fontSize = 14.sp)
                 }
             }
         }
@@ -544,12 +545,28 @@ fun JourneyCard(journey: JourneyUi, onSave: () -> Unit) {
 }
 
 @Composable
-fun JourneyLegsDetail(legs: List<Leg>) {
+fun JourneyLegsDetail(legs: List<Leg>, showLabels: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        var trainLegIndex = 0
         legs.forEachIndexed { index, leg ->
             if (leg.walking == true) {
                 WalkingLegRow()
             } else {
+                if (showLabels) {
+                    val label = if (trainLegIndex == 0) "Abfahrt" else "Umstieg"
+                    val labelColor = if (trainLegIndex == 0) Cyan else Warning
+                    Surface(
+                        color = labelColor.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            label, color = labelColor,
+                            fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                trainLegIndex++
                 TrainLegRow(leg)
             }
             // Transfer time between two train legs
@@ -585,7 +602,7 @@ fun TrainLegRow(leg: Leg) {
     val depDelay = (leg.departureDelay ?: 0) / 60
     val arrDelay = (leg.arrivalDelay ?: 0) / 60
     val cancelled = leg.cancelled == true
-    val platform = leg.platform ?: leg.plannedPlatform
+    val platform = leg.departurePlatform ?: leg.plannedDeparturePlatform ?: leg.platform ?: leg.plannedPlatform
 
     val statusColor = when {
         cancelled -> Error

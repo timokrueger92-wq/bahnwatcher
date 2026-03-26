@@ -156,7 +156,7 @@ fun BahnWatcherApp() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedRoute) {
-                "favorites" -> FavoritesScreen(vm = vm)
+                "favorites" -> FavoritesScreen(vm = vm, onNavigateToSettings = { selectedRoute = "settings" })
                 "search" -> SearchScreen(vm = vm)
                 "alternatives" -> AlternativesScreen(vm = vm)
                 "settings" -> SettingsScreen(vm = vm)
