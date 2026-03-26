@@ -8,6 +8,8 @@ import com.bahnwatcher.data.repository.AppSettings
 import com.bahnwatcher.data.repository.BahnRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -91,9 +93,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---- Alternatives station search ----
 
+    private var searchAltStationsJob: Job? = null
+
     fun searchAltStations(query: String) {
+        searchAltStationsJob?.cancel()
         if (query.length < 2) { _altSuggestions.value = emptyList(); return }
-        viewModelScope.launch {
+        searchAltStationsJob = viewModelScope.launch {
+            delay(300)
             val results = repo.searchStations(query)
             _altSuggestions.value = results.filter { it.type == "stop" || it.type == "station" }
         }
@@ -177,12 +183,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---- Station search ----
 
+    private var searchStationsJob: Job? = null
+
     fun searchStations(query: String) {
+        searchStationsJob?.cancel()
         if (query.length < 2) {
             _stationSuggestions.value = emptyList()
             return
         }
-        viewModelScope.launch {
+        searchStationsJob = viewModelScope.launch {
+            delay(300)
             val results = repo.searchStations(query)
             _stationSuggestions.value = results.filter { it.type == "stop" || it.type == "station" }
         }
