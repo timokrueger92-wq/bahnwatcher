@@ -45,7 +45,12 @@ fun FavoritesScreen(vm: MainViewModel) {
         FavoriteDetailDialog(
             fav = notifDetailFav,
             status = statuses[notifDetailFav.id],
-            onDismiss = { notifDetailFavId = null }
+            onDismiss = { notifDetailFavId = null },
+            onFindAlternatives = {
+                vm.prefillAlternatives(notifDetailFav.fromId, notifDetailFav.fromName,
+                    notifDetailFav.toId, notifDetailFav.toName)
+                notifDetailFavId = null
+            }
         )
     }
 
@@ -103,7 +108,10 @@ fun FavoritesScreen(vm: MainViewModel) {
                         status = statuses[fav.id],
                         isRefreshing = fav.id in refreshing,
                         onRefresh = { vm.refreshFavorite(fav) },
-                        onDelete = { vm.deleteFavorite(fav.id) }
+                        onDelete = { vm.deleteFavorite(fav.id) },
+                        onFindAlternatives = {
+                            vm.prefillAlternatives(fav.fromId, fav.fromName, fav.toId, fav.toName)
+                        }
                     )
                 }
             }
@@ -117,7 +125,8 @@ fun FavoriteCard(
     status: FavoriteStatus?,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onFindAlternatives: () -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDetail by remember { mutableStateOf(false) }
@@ -140,7 +149,12 @@ fun FavoriteCard(
     }
 
     if (showDetail) {
-        FavoriteDetailDialog(fav = fav, status = status, onDismiss = { showDetail = false })
+        FavoriteDetailDialog(
+            fav = fav,
+            status = status,
+            onDismiss = { showDetail = false },
+            onFindAlternatives = { onFindAlternatives(); showDetail = false }
+        )
     }
 
     val statusColor = when (status?.status) {
@@ -257,7 +271,12 @@ fun FavoriteCard(
 }
 
 @Composable
-fun FavoriteDetailDialog(fav: Favorite, status: FavoriteStatus?, onDismiss: () -> Unit) {
+fun FavoriteDetailDialog(
+    fav: Favorite,
+    status: FavoriteStatus?,
+    onDismiss: () -> Unit,
+    onFindAlternatives: (() -> Unit)? = null
+) {
     val dayLabels = listOf(1 to "Mo", 2 to "Di", 3 to "Mi", 4 to "Do", 5 to "Fr", 6 to "Sa", 0 to "So")
     val activeDays = fav.days.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
 
@@ -345,6 +364,21 @@ fun FavoriteDetailDialog(fav: Favorite, status: FavoriteStatus?, onDismiss: () -
                         .atZone(ZoneId.systemDefault())
                         .format(DateTimeFormatter.ofPattern("dd.MM. HH:mm"))
                     Text("Zuletzt geprüft: $checkedTime", color = OnSurfaceMuted, fontSize = 11.sp)
+                }
+
+                // Show alternatives button when connection is problematic
+                if (onFindAlternatives != null &&
+                    (status?.status == "delay" || status?.status == "cancelled")) {
+                    HorizontalDivider(color = Border)
+                    OutlinedButton(
+                        onClick = onFindAlternatives,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Warning),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.DirectionsWalk, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Alternativen suchen", fontSize = 13.sp)
+                    }
                 }
             }
         },

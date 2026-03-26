@@ -60,12 +60,120 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _refreshingFav = MutableStateFlow<Set<String>>(emptySet())
     val refreshingFav = _refreshingFav.asStateFlow()
 
-    // ---- Alternatives state ----
+    // ---- Nearby stops (legacy, kept for compatibility) ----
     private val _nearbyStops = MutableStateFlow<List<NearbyStopUi>>(emptyList())
     val nearbyStops = _nearbyStops.asStateFlow()
 
     private val _nearbyLoading = MutableStateFlow(false)
     val nearbyLoading = _nearbyLoading.asStateFlow()
+
+    // ---- Alternatives state ----
+    private val _altFromStation = MutableStateFlow<StopLocation?>(null)
+    val altFromStation = _altFromStation.asStateFlow()
+
+    private val _altToStation = MutableStateFlow<StopLocation?>(null)
+    val altToStation = _altToStation.asStateFlow()
+
+    private val _altSuggestions = MutableStateFlow<List<StopLocation>>(emptyList())
+    val altSuggestions = _altSuggestions.asStateFlow()
+
+    private val _alternativeResults = MutableStateFlow<List<AlternativeResult>>(emptyList())
+    val alternativeResults = _alternativeResults.asStateFlow()
+
+    private val _alternativesLoading = MutableStateFlow(false)
+    val alternativesLoading = _alternativesLoading.asStateFlow()
+
+    private val _alternativesError = MutableStateFlow<String?>(null)
+    val alternativesError = _alternativesError.asStateFlow()
+
+    private val _pendingAlternativeSearch = MutableStateFlow(false)
+    val pendingAlternativeSearch = _pendingAlternativeSearch.asStateFlow()
+
+    // ---- Alternatives station search ----
+
+    fun searchAltStations(query: String) {
+        if (query.length < 2) { _altSuggestions.value = emptyList(); return }
+        viewModelScope.launch {
+            val results = repo.searchStations(query)
+            _altSuggestions.value = results.filter { it.type == "stop" || it.type == "station" }
+        }
+    }
+
+    fun clearAltSuggestions() { _altSuggestions.value = emptyList() }
+
+    fun setAltFromStation(stop: StopLocation) {
+        _altFromStation.value = stop
+        _altSuggestions.value = emptyList()
+    }
+
+    fun setAltToStation(stop: StopLocation) {
+        _altToStation.value = stop
+        _altSuggestions.value = emptyList()
+    }
+
+    fun prefillAlternatives(fromId: String, fromName: String, toId: String, toName: String) {
+        _altFromStation.value = StopLocation(id = fromId, name = fromName, type = "stop", location = null)
+        _altToStation.value = StopLocation(id = toId, name = toName, type = "stop", location = null)
+        _pendingAlternativeSearch.value = true
+    }
+
+    fun clearPendingAlternativeSearch() { _pendingAlternativeSearch.value = false }
+
+    fun searchAlternatives(lat: Double? = null, lon: Double? = null) {
+        val from = _altFromStation.value ?: return
+        val to = _altToStation.value ?: return
+        val fromId = from.id ?: return
+        val toId = to.id ?: return
+
+        viewModelScope.launch {
+            _alternativesLoading.value = true
+            _alternativesError.value = null
+            _alternativeResults.value = emptyList()
+            try {
+                val nowIso = java.time.Instant.now().toString()
+                val results = mutableListOf<AlternativeResult>()
+
+                // Direct alternatives from the given station
+                val direct = repo.searchJourneys(fromId, toId, nowIso, isDeparture = true, results = 5)
+                if (direct.isNotEmpty()) {
+                    results.add(AlternativeResult(walkMinutes = 0, stationName = from.name ?: "", journeys = direct))
+                }
+
+                // Nearby stations reachable on foot (only if GPS provided)
+                if (lat != null && lon != null) {
+                    val nearby = repo.getNearbyStops(lat, lon)
+                    nearby.filter { it.type == "stop" || it.type == "station" }
+                        .take(8)
+                        .forEach { stop ->
+                            val dist = if (stop.location != null)
+                                repo.haversineDistance(lat, lon,
+                                    stop.location.latitude ?: 0.0,
+                                    stop.location.longitude ?: 0.0)
+                            else (stop.distance?.toDouble() ?: 9999.0)
+                            val walkMin = repo.walkingMinutes(dist)
+                            if (walkMin in 1..15 && stop.id != null && stop.id != fromId) {
+                                val journeys = repo.searchJourneys(
+                                    stop.id, toId, nowIso, isDeparture = true, results = 3)
+                                if (journeys.isNotEmpty()) {
+                                    results.add(AlternativeResult(
+                                        walkMinutes = walkMin,
+                                        stationName = stop.name ?: "",
+                                        journeys = journeys
+                                    ))
+                                }
+                            }
+                        }
+                }
+
+                _alternativeResults.value = results
+                if (results.isEmpty()) _alternativesError.value = "Keine Alternativen gefunden."
+            } catch (e: Exception) {
+                _alternativesError.value = "Fehler: ${e.message}"
+            } finally {
+                _alternativesLoading.value = false
+            }
+        }
+    }
 
     // ---- Station search ----
 

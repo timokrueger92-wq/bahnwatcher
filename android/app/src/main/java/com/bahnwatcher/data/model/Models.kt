@@ -130,3 +130,9 @@ data class NearbyStopUi(
     val reachable: Boolean,
     val departures: List<Departure>
 )
+
+data class AlternativeResult(
+    val walkMinutes: Int,       // 0 = direct from fromStation, >0 = walk to another station
+    val stationName: String,    // the station these journeys depart from
+    val journeys: List<JourneyUi>
+)
