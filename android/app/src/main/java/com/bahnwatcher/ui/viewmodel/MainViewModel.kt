@@ -242,6 +242,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ---- Notification deep-link state ----
+
+    private val _pendingFavoriteId = MutableStateFlow<String?>(null)
+    val pendingFavoriteId = _pendingFavoriteId.asStateFlow()
+
+    private val _pendingOpenSearch = MutableStateFlow(false)
+    val pendingOpenSearch = _pendingOpenSearch.asStateFlow()
+
+    fun handleNotificationFavoriteIntent(favoriteId: String) {
+        _pendingFavoriteId.value = favoriteId
+    }
+
+    fun handleNotificationSearchIntent(fromId: String, fromName: String, toId: String, toName: String) {
+        _fromStation.value = StopLocation(id = fromId, name = fromName, type = "stop", location = null)
+        _toStation.value = StopLocation(id = toId, name = toName, type = "stop", location = null)
+        searchJourneys(LocalDateTime.now(), isDeparture = true)
+        _pendingOpenSearch.value = true
+    }
+
+    fun clearPendingFavorite() {
+        _pendingFavoriteId.value = null
+    }
+
+    fun clearPendingSearch() {
+        _pendingOpenSearch.value = false
+    }
+
     // ---- Settings ----
 
     fun saveSettings(s: AppSettings) {

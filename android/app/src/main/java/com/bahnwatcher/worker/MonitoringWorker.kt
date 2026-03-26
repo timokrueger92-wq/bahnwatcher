@@ -2,11 +2,13 @@ package com.bahnwatcher.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.*
+import com.bahnwatcher.MainActivity
 import com.bahnwatcher.R
 import com.bahnwatcher.data.model.Favorite
 import com.bahnwatcher.data.repository.BahnRepository
@@ -23,8 +25,14 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
         const val WORK_NAME = "bahnwatcher_monitoring"
         const val NOTIFICATION_CHANNEL_ID = "bahnwatcher_alerts"
 
-        // WorkManager minimum is 15 minutes. We add a 5-minute flex window so Android
-        // can batch this with other apps' work → better battery efficiency.
+        // Intent extras for deep-linking from notification
+        const val EXTRA_FAVORITE_ID = "extra_favorite_id"
+        const val EXTRA_OPEN_SEARCH = "extra_open_search"
+        const val EXTRA_FROM_ID = "extra_from_id"
+        const val EXTRA_FROM_NAME = "extra_from_name"
+        const val EXTRA_TO_ID = "extra_to_id"
+        const val EXTRA_TO_NAME = "extra_to_name"
+
         private const val INTERVAL_MINUTES = 15L
         private const val FLEX_MINUTES = 5L
 
@@ -38,11 +46,9 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
                         .setRequiredNetworkType(NetworkType.CONNECTED)
                         .build()
                 )
-                // Exponential backoff on failure (network hiccup etc.)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
 
-            // UPDATE replaces any existing schedule so changes take effect immediately.
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_NAME,
                 ExistingPeriodicWorkPolicy.UPDATE,
@@ -67,17 +73,59 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
             mgr.createNotificationChannel(channel)
         }
 
-        fun sendNotification(context: Context, title: String, message: String) {
+        fun sendNotification(
+            context: Context,
+            title: String,
+            message: String,
+            favoriteId: String,
+            fromId: String,
+            fromName: String,
+            toId: String,
+            toName: String
+        ) {
             createNotificationChannel(context)
             val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Tap opens MainActivity → Favoriten-Tab → Detail-Dialog für diesen Favoriten
+            val mainIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_FAVORITE_ID, favoriteId)
+            }
+            val mainPendingIntent = PendingIntent.getActivity(
+                context,
+                favoriteId.hashCode(),
+                mainIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Action-Button öffnet Suche mit vorausgefüllter Von/Nach-Strecke
+            val searchIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_OPEN_SEARCH, true)
+                putExtra(EXTRA_FROM_ID, fromId)
+                putExtra(EXTRA_FROM_NAME, fromName)
+                putExtra(EXTRA_TO_ID, toId)
+                putExtra(EXTRA_TO_NAME, toName)
+            }
+            val searchPendingIntent = PendingIntent.getActivity(
+                context,
+                (favoriteId + "_search").hashCode(),
+                searchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setContentIntent(mainPendingIntent)
+                .addAction(R.drawable.ic_notification, "Verbindungen suchen", searchPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build()
-            mgr.notify(System.currentTimeMillis().toInt(), notification)
+
+            mgr.notify(favoriteId.hashCode(), notification)
         }
     }
 
@@ -91,9 +139,8 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
         if (favorites.isEmpty()) return Result.success()
 
         val now = LocalTime.now()
-        val todayDay = LocalDate.now().dayOfWeek.value % 7 // 0=Sun, 1=Mon, ...
+        val todayDay = LocalDate.now().dayOfWeek.value % 7
 
-        // Early exit: if no favorite has an active window right now, skip all API calls.
         val activeFavorites = favorites.filter { isInWindow(it, now, todayDay) }
         if (activeFavorites.isEmpty()) return Result.success()
 
@@ -101,7 +148,7 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
             val newStatus = runCatching { repo.checkFavoriteStatus(fav) }.getOrNull()
                 ?: return@forEach
 
-            val message: String? = when {
+            val baseMessage: String? = when {
                 newStatus.status == "cancelled" && fav.lastStatus != "cancelled" ->
                     "Zug ausgefallen!"
                 newStatus.status == "delay" && fav.lastStatus != "delay" ->
@@ -115,7 +162,37 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
                 else -> null
             }
 
-            message?.let { sendNotification(applicationContext, fav.name, it) }
+            if (baseMessage != null) {
+                // Bei Ausfall oder Verspätung: nächste Alternative suchen
+                val alternativeText = if (newStatus.status in listOf("cancelled", "delay")) {
+                    runCatching {
+                        val nowIso = java.time.Instant.now().toString()
+                        val alternatives = repo.searchJourneys(
+                            fromId = fav.fromId,
+                            toId = fav.toId,
+                            isoDateTime = nowIso,
+                            isDeparture = true,
+                            results = 5
+                        )
+                        val next = alternatives.firstOrNull { !it.cancelled }
+                        if (next != null) "\nAlternative: ${next.departure} → ${next.arrival} (${next.durationMin / 60}h ${next.durationMin % 60}min)"
+                        else ""
+                    }.getOrDefault("")
+                } else ""
+
+                val fullMessage = baseMessage + alternativeText
+
+                sendNotification(
+                    context = applicationContext,
+                    title = fav.name,
+                    message = fullMessage,
+                    favoriteId = fav.id,
+                    fromId = fav.fromId,
+                    fromName = fav.fromName,
+                    toId = fav.toId,
+                    toName = fav.toName
+                )
+            }
 
             repo.updateFavorite(
                 fav.copy(
@@ -146,10 +223,6 @@ class MonitoringWorker(context: Context, params: WorkerParameters) :
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        // Only reschedule if monitoring was active before reboot.
-        // We read the DataStore synchronously via runBlocking in the receiver
-        // (acceptable here since BroadcastReceiver must return quickly but
-        //  this is a very fast DataStore read).
         kotlinx.coroutines.runBlocking {
             val repo = BahnRepository(context)
             val settings = repo.settings.first()
