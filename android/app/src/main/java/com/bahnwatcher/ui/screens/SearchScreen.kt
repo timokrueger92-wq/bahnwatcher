@@ -59,7 +59,7 @@ fun SearchScreen(vm: MainViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark),
-        contentPadding = PaddingValues(horizontal = 16.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // ---- Search controls (fixed header area) ----
