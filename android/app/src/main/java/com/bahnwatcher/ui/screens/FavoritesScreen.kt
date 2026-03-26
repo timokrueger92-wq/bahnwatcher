@@ -31,6 +31,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
     val favorites by vm.favorites.collectAsState()
@@ -70,10 +71,14 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
         if (favorites.isNotEmpty()) vm.refreshAllFavorites()
     }
 
+    PullToRefreshBox(
+        isRefreshing = refreshing.isNotEmpty(),
+        onRefresh = { vm.refreshAllFavorites() },
+        modifier = Modifier.fillMaxSize().background(BackgroundDark)
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
             .padding(16.dp)
     ) {
         Row(
@@ -138,6 +143,7 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
             }
         }
     }
+    } // PullToRefreshBox
 }
 
 @Composable
