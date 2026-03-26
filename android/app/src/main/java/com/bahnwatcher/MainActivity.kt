@@ -1,6 +1,7 @@
 package com.bahnwatcher
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bahnwatcher.ui.screens.*
 import com.bahnwatcher.ui.theme.*
@@ -37,13 +39,42 @@ val navItems = listOf(
 )
 
 class MainActivity : ComponentActivity() {
+
+    private val vm: MainViewModel by lazy {
+        ViewModelProvider(this)[MainViewModel::class.java]
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Only process notification intent on first creation, not on config changes
+        if (savedInstanceState == null) {
+            processNotificationIntent(intent)
+        }
         enableEdgeToEdge()
         setContent {
             com.bahnwatcher.ui.theme.BahnWatcherTheme {
                 BahnWatcherApp()
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        processNotificationIntent(intent)
+    }
+
+    private fun processNotificationIntent(intent: Intent) {
+        val favoriteId = intent.getStringExtra(MonitoringWorker.EXTRA_FAVORITE_ID)
+        if (favoriteId != null) {
+            vm.handleNotificationFavoriteIntent(favoriteId)
+            return
+        }
+        if (intent.getBooleanExtra(MonitoringWorker.EXTRA_OPEN_SEARCH, false)) {
+            val fromId = intent.getStringExtra(MonitoringWorker.EXTRA_FROM_ID) ?: return
+            val fromName = intent.getStringExtra(MonitoringWorker.EXTRA_FROM_NAME) ?: return
+            val toId = intent.getStringExtra(MonitoringWorker.EXTRA_TO_ID) ?: return
+            val toName = intent.getStringExtra(MonitoringWorker.EXTRA_TO_NAME) ?: return
+            vm.handleNotificationSearchIntent(fromId, fromName, toId, toName)
         }
     }
 }
@@ -54,6 +85,20 @@ fun BahnWatcherApp() {
     val settings by vm.settings.collectAsState()
     var selectedRoute by remember { mutableStateOf("favorites") }
     val context = LocalContext.current
+
+    val pendingFavoriteId by vm.pendingFavoriteId.collectAsState()
+    val pendingOpenSearch by vm.pendingOpenSearch.collectAsState()
+
+    // Navigate to the right tab when a notification deep-link arrives
+    LaunchedEffect(pendingFavoriteId) {
+        if (pendingFavoriteId != null) selectedRoute = "favorites"
+    }
+    LaunchedEffect(pendingOpenSearch) {
+        if (pendingOpenSearch) {
+            selectedRoute = "search"
+            vm.clearPendingSearch()
+        }
+    }
 
     // Request POST_NOTIFICATIONS permission on Android 13+ at first launch.
     // We launch this once; the result is handled silently – the SettingsScreen

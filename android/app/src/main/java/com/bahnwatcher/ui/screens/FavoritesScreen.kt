@@ -30,6 +30,24 @@ fun FavoritesScreen(vm: MainViewModel) {
     val statuses by vm.favoriteStatuses.collectAsState()
     val refreshing by vm.refreshingFav.collectAsState()
     val settings by vm.settings.collectAsState()
+    val pendingFavoriteId by vm.pendingFavoriteId.collectAsState()
+
+    // Auto-open detail dialog when arriving from a notification tap
+    var notifDetailFavId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingFavoriteId) {
+        if (pendingFavoriteId != null) {
+            notifDetailFavId = pendingFavoriteId
+            vm.clearPendingFavorite()
+        }
+    }
+    val notifDetailFav = favorites.find { it.id == notifDetailFavId }
+    if (notifDetailFav != null) {
+        FavoriteDetailDialog(
+            fav = notifDetailFav,
+            status = statuses[notifDetailFav.id],
+            onDismiss = { notifDetailFavId = null }
+        )
+    }
 
     LaunchedEffect(Unit) {
         if (favorites.isNotEmpty()) vm.refreshAllFavorites()
