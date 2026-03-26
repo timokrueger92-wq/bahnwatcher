@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,10 +72,21 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
         if (favorites.isNotEmpty()) vm.refreshAllFavorites()
     }
 
-    PullToRefreshBox(
-        isRefreshing = refreshing.isNotEmpty(),
-        onRefresh = { vm.refreshAllFavorites() },
-        modifier = Modifier.fillMaxSize().background(BackgroundDark)
+    val pullState = rememberPullToRefreshState()
+    if (pullState.isRefreshing) {
+        LaunchedEffect(Unit) {
+            vm.refreshAllFavorites()
+        }
+    }
+    LaunchedEffect(refreshing.isEmpty()) {
+        if (refreshing.isEmpty()) pullState.endRefresh()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundDark)
+            .nestedScroll(pullState.nestedScrollConnection)
     ) {
     Column(
         modifier = Modifier
@@ -143,7 +155,11 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
             }
         }
     }
-    } // PullToRefreshBox
+        PullToRefreshContainer(
+            state = pullState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+    } // Box
 }
 
 @Composable
