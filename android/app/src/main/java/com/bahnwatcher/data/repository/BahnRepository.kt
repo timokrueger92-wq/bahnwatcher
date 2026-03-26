@@ -156,30 +156,43 @@ class BahnRepository(private val context: Context) {
     }
 
     suspend fun checkFavoriteStatus(fav: Favorite): FavoriteStatus {
-        val departures = getDepartures(fav.fromId)
-        val now = Instant.now()
+        // Use journey search (from→to) instead of departure board so we get the
+        // correct connection and not just any train leaving fromId
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+        val timeFrom = runCatching {
+            java.time.LocalTime.parse(fav.timeFrom, fmt)
+        }.getOrNull()
 
-        // Find next departure towards destination within a 2-hour window
-        val dep = departures.firstOrNull { d ->
-            val whenStr = d.`when` ?: d.plannedWhen ?: return@firstOrNull false
-            runCatching {
-                val instant = Instant.parse(whenStr)
-                instant.isAfter(now) && instant.isBefore(now.plus(2, ChronoUnit.HOURS))
-            }.getOrDefault(false)
+        val now = java.time.LocalDateTime.now()
+        val searchTime = if (timeFrom != null) {
+            var t = now.toLocalDate().atTime(timeFrom)
+            // If the scheduled time is more than 30 min in the past, look at tomorrow
+            if (t.isBefore(now.minusMinutes(30))) t = t.plusDays(1)
+            t
+        } else {
+            now
         }
+        val isoTime = searchTime.atZone(ZoneId.systemDefault()).toInstant().toString()
 
-        if (dep == null) return FavoriteStatus(fav.id, "unknown", 0, "", "")
+        val journeys = runCatching {
+            searchJourneys(fav.fromId, fav.toId, isoTime, isDeparture = true, results = 3)
+        }.getOrDefault(emptyList())
+
+        val journey = journeys.firstOrNull()
+            ?: return FavoriteStatus(fav.id, "unknown", 0, "", "")
 
         val status = when {
-            dep.cancelled == true -> "cancelled"
-            (dep.delay ?: 0) > 0 -> "delay"
+            journey.cancelled -> "cancelled"
+            journey.departureDelay > 0 -> "delay"
             else -> "ok"
         }
-        val delayMin = (dep.delay ?: 0) / 60
-        val platform = dep.platform ?: dep.plannedPlatform ?: ""
-        val nextDep = dep.`when` ?: dep.plannedWhen ?: ""
-
-        return FavoriteStatus(fav.id, status, delayMin, platform, formatTime(nextDep))
+        return FavoriteStatus(
+            favoriteId = fav.id,
+            status = status,
+            delay = journey.departureDelay,
+            platform = journey.platform,
+            nextDeparture = journey.departure
+        )
     }
 
     // ---- Helpers ----
