@@ -131,7 +131,7 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
                         onRefresh = { vm.refreshFavorite(fav) },
                         onDelete = { vm.deleteFavorite(fav.id) },
                         onFindAlternatives = {
-                            vm.prefillAlternatives(fav.fromId, fav.fromName, fav.toId, fav.toName)
+                            vm.prefillAlternatives(fav.fromId, fav.fromName, fav.toId, fav.toName, fav.id)
                         }
                     )
                 }

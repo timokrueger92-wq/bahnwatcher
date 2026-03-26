@@ -18,7 +18,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.style.TextAlign
 import com.bahnwatcher.data.model.AlternativeResult
+import com.bahnwatcher.data.model.Favorite
 import com.bahnwatcher.data.model.JourneyUi
 import com.bahnwatcher.ui.theme.*
 import com.bahnwatcher.ui.viewmodel.MainViewModel
@@ -32,6 +38,11 @@ fun AlternativesScreen(vm: MainViewModel) {
     val loading by vm.alternativesLoading.collectAsState()
     val error by vm.alternativesError.collectAsState()
     val pendingAlt by vm.pendingAlternativeSearch.collectAsState()
+    val favorites by vm.favorites.collectAsState()
+    val altSourceFavId by vm.altSourceFavoriteId.collectAsState()
+    val sourceFavorite = favorites.find { it.id == altSourceFavId }
+
+    var detailJourney by remember { mutableStateOf<JourneyUi?>(null) }
 
     var fromQuery by remember { mutableStateOf(altFrom?.name ?: "") }
     var toQuery by remember { mutableStateOf(altTo?.name ?: "") }
@@ -187,10 +198,22 @@ fun AlternativesScreen(vm: MainViewModel) {
                 items(group.journeys,
                     key = { j -> "${group.stationName}_${j.departure}_${j.arrival}" }
                 ) { journey ->
-                    AlternativeJourneyCard(journey)
+                    AlternativeJourneyCard(journey, onClick = { detailJourney = journey })
                 }
             }
         }
+    }
+
+    detailJourney?.let { journey ->
+        AltJourneyDetailDialog(
+            journey = journey,
+            sourceFavorite = sourceFavorite,
+            onDismiss = { detailJourney = null },
+            onSave = { name, days, replaceFavId ->
+                vm.saveOrReplaceFavorite(journey, name, days, replaceFavId)
+                detailJourney = null
+            }
+        )
     }
 }
 
@@ -214,11 +237,11 @@ fun AlternativeGroupHeader(group: AlternativeResult) {
 }
 
 @Composable
-fun AlternativeJourneyCard(journey: JourneyUi) {
+fun AlternativeJourneyCard(journey: JourneyUi, onClick: () -> Unit = {}) {
     Card(
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         if (journey.cancelled) {
             Surface(
@@ -280,6 +303,195 @@ fun AlternativeJourneyCard(journey: JourneyUi) {
             }
         }
     }
+}
+
+@Composable
+fun AltJourneyDetailDialog(
+    journey: JourneyUi,
+    sourceFavorite: Favorite?,
+    onDismiss: () -> Unit,
+    onSave: (name: String, days: List<Int>, replaceFavId: String?) -> Unit
+) {
+    var showSaveDialog by remember { mutableStateOf(false) }
+
+    if (showSaveDialog) {
+        AltSaveDialog(
+            journey = journey,
+            sourceFavorite = sourceFavorite,
+            onSave = { name, days, replaceFavId ->
+                onSave(name, days, replaceFavId)
+                showSaveDialog = false
+            },
+            onDismiss = { showSaveDialog = false }
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        title = {
+            Column {
+                Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(journey.departure,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                                color = if (journey.cancelled) Error else OnSurface)
+                            if (journey.departureDelay > 0)
+                                Text("+${journey.departureDelay}'", color = Warning, fontSize = 14.sp)
+                        }
+                        Text(journey.from, color = OnSurfaceMuted, fontSize = 12.sp)
+                    }
+                    Icon(Icons.Default.TrendingFlat, null, tint = OnSurfaceMuted)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (journey.arrivalDelay > 0)
+                                Text("+${journey.arrivalDelay}'", color = Warning, fontSize = 14.sp)
+                            Text(journey.arrival,
+                                fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                                color = if (journey.cancelled) Error else OnSurface)
+                        }
+                        Text(journey.to, color = OnSurfaceMuted, fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = androidx.compose.ui.Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                HorizontalDivider(color = Border)
+                JourneyLegsDetail(legs = journey.legs, showLabels = true)
+                HorizontalDivider(color = Border)
+                OutlinedButton(
+                    onClick = { showSaveDialog = true },
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Cyan)
+                ) {
+                    Icon(Icons.Default.BookmarkAdd, null,
+                        modifier = androidx.compose.ui.Modifier.size(16.dp))
+                    Spacer(androidx.compose.ui.Modifier.width(6.dp))
+                    Text(
+                        if (sourceFavorite != null) "Speichern / Favorit ersetzen"
+                        else "Als Favorit speichern",
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Schließen", color = Cyan) }
+        }
+    )
+}
+
+@Composable
+fun AltSaveDialog(
+    journey: JourneyUi,
+    sourceFavorite: Favorite?,
+    onSave: (name: String, days: List<Int>, replaceFavId: String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember {
+        mutableStateOf(sourceFavorite?.name ?: "${journey.from} → ${journey.to}")
+    }
+    val allDays = listOf(1, 2, 3, 4, 5)
+    var selectedDays by remember {
+        mutableStateOf(
+            sourceFavorite?.days?.split(",")?.mapNotNull { it.trim().toIntOrNull() }?.toSet()
+                ?: allDays.toSet()
+        )
+    }
+    var replaceExisting by remember { mutableStateOf(sourceFavorite != null) }
+    val dayLabels = listOf(1 to "Mo", 2 to "Di", 3 to "Mi", 4 to "Do", 5 to "Fr", 6 to "Sa", 0 to "So")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        title = { Text("Als Favorit speichern", color = OnSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = OnSurface, unfocusedTextColor = OnSurface,
+                        focusedBorderColor = Cyan, unfocusedBorderColor = Border
+                    )
+                )
+
+                if (sourceFavorite != null) {
+                    HorizontalDivider(color = Border)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = androidx.compose.ui.Modifier.clickable {
+                            replaceExisting = !replaceExisting
+                        }
+                    ) {
+                        Checkbox(
+                            checked = replaceExisting,
+                            onCheckedChange = { replaceExisting = it },
+                            colors = CheckboxDefaults.colors(checkedColor = Cyan)
+                        )
+                        Column {
+                            Text("Bestehenden Favorit ersetzen", color = OnSurface, fontSize = 13.sp)
+                            Text("\"${sourceFavorite.name}\"",
+                                color = OnSurfaceMuted, fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                Text("Tage überwachen:", color = OnSurfaceMuted, fontSize = 13.sp)
+                Row(
+                    modifier = androidx.compose.ui.Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    dayLabels.forEach { (day, label) ->
+                        FilterChip(
+                            selected = day in selectedDays,
+                            onClick = {
+                                selectedDays = if (day in selectedDays)
+                                    selectedDays - day else selectedDays + day
+                            },
+                            label = { Text(label, fontSize = 11.sp) },
+                            modifier = androidx.compose.ui.Modifier.defaultMinSize(minWidth = 1.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Cyan.copy(alpha = 0.2f),
+                                selectedLabelColor = Cyan
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        name,
+                        selectedDays.toList(),
+                        if (replaceExisting) sourceFavorite?.id else null
+                    )
+                },
+                enabled = name.isNotBlank() && selectedDays.isNotEmpty()
+            ) { Text("Speichern", color = Cyan) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        }
+    )
 }
 
 private fun getLocation(
