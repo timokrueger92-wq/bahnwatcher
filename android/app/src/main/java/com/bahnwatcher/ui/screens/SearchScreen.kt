@@ -73,12 +73,20 @@ fun SearchScreen(vm: MainViewModel) {
                         label = "Von",
                         value = fromQuery,
                         icon = Icons.Default.TripOrigin,
+                        suggestions = if (activeField == "from") suggestions else emptyList(),
+                        isActive = activeField == "from",
                         onValueChange = {
                             fromQuery = it
                             activeField = "from"
                             vm.searchStations(it)
                         },
-                        onClear = { fromQuery = ""; vm.clearSuggestions() }
+                        onClear = { fromQuery = ""; vm.clearSuggestions() },
+                        onSuggestionSelected = { stop ->
+                            fromQuery = stop.name ?: ""
+                            vm.setFromStation(stop)
+                            activeField = null
+                        },
+                        onDismissSuggestions = { activeField = null }
                     )
                     HorizontalDivider(color = Border, modifier = Modifier.padding(vertical = 8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -86,12 +94,20 @@ fun SearchScreen(vm: MainViewModel) {
                             label = "Nach",
                             value = toQuery,
                             icon = Icons.Default.Place,
+                            suggestions = if (activeField == "to") suggestions else emptyList(),
+                            isActive = activeField == "to",
                             onValueChange = {
                                 toQuery = it
                                 activeField = "to"
                                 vm.searchStations(it)
                             },
                             onClear = { toQuery = ""; vm.clearSuggestions() },
+                            onSuggestionSelected = { stop ->
+                                toQuery = stop.name ?: ""
+                                vm.setToStation(stop)
+                                activeField = null
+                            },
+                            onDismissSuggestions = { activeField = null },
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(onClick = {
@@ -100,27 +116,6 @@ fun SearchScreen(vm: MainViewModel) {
                         }) {
                             Icon(Icons.Default.SwapVert, contentDescription = "Tauschen", tint = Cyan)
                         }
-                    }
-                }
-            }
-
-            if (suggestions.isNotEmpty() && activeField != null) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = SurfaceVariant),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    suggestions.take(6).forEach { stop ->
-                        StationSuggestionItem(stop = stop, onClick = {
-                            if (activeField == "from") {
-                                fromQuery = stop.name ?: ""
-                                vm.setFromStation(stop)
-                            } else {
-                                toQuery = stop.name ?: ""
-                                vm.setToStation(stop)
-                            }
-                            activeField = null
-                        })
                     }
                 }
             }
@@ -251,48 +246,60 @@ fun StationField(
     label: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    suggestions: List<StopLocation> = emptyList(),
+    isActive: Boolean = false,
     onValueChange: (String) -> Unit,
     onClear: () -> Unit,
+    onSuggestionSelected: (StopLocation) -> Unit = {},
+    onDismissSuggestions: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = OnSurfaceMuted, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        TextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = { Text(label, color = OnSurfaceMuted) },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                focusedTextColor = OnSurface,
-                unfocusedTextColor = OnSurface
-            ),
-            singleLine = true,
-            modifier = Modifier.weight(1f)
-        )
-        if (value.isNotEmpty()) {
-            IconButton(onClick = onClear, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Clear, contentDescription = null, tint = OnSurfaceMuted, modifier = Modifier.size(16.dp))
+    Box(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = OnSurfaceMuted, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            TextField(
+                value = value,
+                onValueChange = onValueChange,
+                placeholder = { Text(label, color = OnSurfaceMuted) },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    focusedTextColor = OnSurface,
+                    unfocusedTextColor = OnSurface
+                ),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            if (value.isNotEmpty()) {
+                IconButton(onClick = onClear, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Clear, contentDescription = null, tint = OnSurfaceMuted, modifier = Modifier.size(16.dp))
+                }
             }
         }
-    }
-}
-
-@Composable
-fun StationSuggestionItem(stop: StopLocation, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Default.Train, contentDescription = null, tint = Cyan, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(stop.name ?: "", color = OnSurface, fontSize = 14.sp)
+        DropdownMenu(
+            expanded = isActive && suggestions.isNotEmpty(),
+            onDismissRequest = onDismissSuggestions,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SurfaceDark)
+        ) {
+            suggestions.take(6).forEach { stop ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Train, contentDescription = null,
+                                tint = Cyan, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(stop.name ?: "", color = OnSurface, fontSize = 14.sp)
+                        }
+                    },
+                    onClick = { onSuggestionSelected(stop) }
+                )
+            }
+        }
     }
 }
 
