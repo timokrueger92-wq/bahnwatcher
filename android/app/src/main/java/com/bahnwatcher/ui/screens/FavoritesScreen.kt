@@ -1,5 +1,7 @@
 package com.bahnwatcher.ui.screens
 
+import android.content.Context
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,11 +15,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bahnwatcher.data.model.Favorite
 import com.bahnwatcher.data.model.FavoriteStatus
+import com.bahnwatcher.data.repository.AppSettings
 import com.bahnwatcher.ui.theme.*
 import com.bahnwatcher.ui.viewmodel.MainViewModel
 import java.time.Instant
@@ -25,7 +29,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun FavoritesScreen(vm: MainViewModel) {
+fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
     val favorites by vm.favorites.collectAsState()
     val statuses by vm.favoriteStatuses.collectAsState()
     val refreshing by vm.refreshingFav.collectAsState()
@@ -87,7 +91,13 @@ fun FavoritesScreen(vm: MainViewModel) {
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
+
+        MonitoringStatusBanner(
+            favorites = favorites,
+            settings = settings,
+            onGoToSettings = onNavigateToSettings
+        )
 
         if (favorites.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -386,4 +396,86 @@ fun FavoriteDetailDialog(
             TextButton(onClick = onDismiss) { Text("Schließen", color = Cyan) }
         }
     )
+}
+
+@Composable
+fun MonitoringStatusBanner(
+    favorites: List<Favorite>,
+    settings: AppSettings,
+    onGoToSettings: () -> Unit
+) {
+    val context = LocalContext.current
+    val batteryOptIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        pm.isIgnoringBatteryOptimizations(context.packageName)
+    } else true
+
+    var monitoringHintDismissed by remember { mutableStateOf(false) }
+
+    when {
+        // Critical: monitoring is on but battery optimization blocks background work
+        settings.monitoring && !batteryOptIgnored -> {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Warning.copy(alpha = 0.12f)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(20.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Akkuoptimierung aktiv",
+                            color = Warning, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Hintergrundchecks können unterbrochen werden",
+                            color = OnSurfaceMuted, fontSize = 11.sp)
+                    }
+                    TextButton(
+                        onClick = onGoToSettings,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text("Beheben →", color = Warning, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        // Soft hint: favorites exist but monitoring is off (dismissable per session)
+        !settings.monitoring && favorites.isNotEmpty() && !monitoringHintDismissed -> {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Cyan.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Default.NotificationsOff, null,
+                        tint = Cyan, modifier = Modifier.size(20.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Monitoring nicht aktiv",
+                            color = OnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Aktiviere es in den Einstellungen für Push-Benachrichtigungen",
+                            color = OnSurfaceMuted, fontSize = 11.sp)
+                    }
+                    TextButton(
+                        onClick = onGoToSettings,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
+                        Text("Aktivieren", color = Cyan, fontSize = 12.sp)
+                    }
+                    IconButton(
+                        onClick = { monitoringHintDismissed = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Close, null,
+                            tint = OnSurfaceMuted, modifier = Modifier.size(14.dp))
+                    }
+                }
+            }
+        }
+    }
 }
