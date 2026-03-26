@@ -586,7 +586,7 @@ fun TrainLegRow(leg: Leg) {
     val depDelay = (leg.departureDelay ?: 0) / 60
     val arrDelay = (leg.arrivalDelay ?: 0) / 60
     val cancelled = leg.cancelled == true
-    val platform = leg.platform ?: leg.plannedPlatform
+    val platform = leg.departurePlatform ?: leg.plannedDeparturePlatform ?: leg.platform ?: leg.plannedPlatform
 
     val statusColor = when {
         cancelled -> Error

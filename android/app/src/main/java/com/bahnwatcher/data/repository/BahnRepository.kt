@@ -126,7 +126,7 @@ class BahnRepository(private val context: Context) {
                 cancelled = legs.any { it.cancelled == true },
                 departureDelay = (firstLeg.departureDelay ?: 0) / 60,
                 arrivalDelay = (lastLeg.arrivalDelay ?: 0) / 60,
-                platform = firstLeg.platform ?: firstLeg.plannedPlatform ?: "",
+                platform = firstLeg.departurePlatform ?: firstLeg.plannedDeparturePlatform ?: firstLeg.platform ?: firstLeg.plannedPlatform ?: "",
                 legs = legs,
                 from = firstLeg.origin?.name ?: "",
                 to = lastLeg.destination?.name ?: "",
