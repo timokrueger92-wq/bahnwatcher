@@ -194,9 +194,14 @@ fun SettingsScreen(vm: MainViewModel) {
             OutlinedButton(
                 onClick = {
                     MonitoringWorker.sendNotification(
-                        context,
-                        "BahnWatcher Test",
-                        "Benachrichtigungen funktionieren im Hintergrund!"
+                        context = context,
+                        title = "BahnWatcher Test",
+                        message = "Benachrichtigungen funktionieren im Hintergrund!",
+                        favoriteId = "test",
+                        fromId = "",
+                        fromName = "",
+                        toId = "",
+                        toName = ""
                     )
                     testSent = true
                 },
