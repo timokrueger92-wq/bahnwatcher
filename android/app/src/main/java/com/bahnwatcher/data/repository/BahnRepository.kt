@@ -6,6 +6,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.bahnwatcher.data.api.TransportApiClient
 import com.bahnwatcher.data.db.AppDatabase
 import com.bahnwatcher.data.model.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -79,8 +80,14 @@ class BahnRepository(private val context: Context) {
 
     // ---- API ----
 
-    suspend fun searchStations(query: String): List<StopLocation> =
-        runCatching { api.searchLocations(query) }.getOrDefault(emptyList())
+    suspend fun searchStations(query: String): List<StopLocation> {
+        repeat(2) { attempt ->
+            val result = runCatching { api.searchLocations(query) }
+            if (result.isSuccess) return result.getOrThrow()
+            if (attempt == 0) delay(500)
+        }
+        return emptyList()
+    }
 
     suspend fun searchJourneys(
         fromId: String,
