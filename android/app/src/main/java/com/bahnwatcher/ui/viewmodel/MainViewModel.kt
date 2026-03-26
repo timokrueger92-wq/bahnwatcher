@@ -117,10 +117,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _altSuggestions.value = emptyList()
     }
 
-    fun prefillAlternatives(fromId: String, fromName: String, toId: String, toName: String) {
+    private val _altSourceFavoriteId = MutableStateFlow<String?>(null)
+    val altSourceFavoriteId = _altSourceFavoriteId.asStateFlow()
+
+    fun prefillAlternatives(fromId: String, fromName: String, toId: String, toName: String, sourceFavId: String? = null) {
         _altFromStation.value = StopLocation(id = fromId, name = fromName, type = "stop", location = null)
         _altToStation.value = StopLocation(id = toId, name = toName, type = "stop", location = null)
+        _altSourceFavoriteId.value = sourceFavId
         _pendingAlternativeSearch.value = true
+    }
+
+    fun saveOrReplaceFavorite(journey: JourneyUi, name: String, days: List<Int>, replaceFavId: String?) {
+        viewModelScope.launch {
+            val depHour = journey.plannedDeparture.take(5)
+            val arrHour = journey.plannedArrival.take(5)
+            val newFav = Favorite(
+                id = replaceFavId ?: "fav_${System.currentTimeMillis()}",
+                name = name,
+                fromId = journey.fromId,
+                fromName = journey.from,
+                toId = journey.toId,
+                toName = journey.to,
+                timeFrom = depHour,
+                timeTo = arrHour,
+                days = days.joinToString(",")
+            )
+            if (replaceFavId != null) repo.deleteFavorite(replaceFavId)
+            repo.addFavorite(newFav)
+        }
     }
 
     fun clearPendingAlternativeSearch() { _pendingAlternativeSearch.value = false }
@@ -373,8 +397,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _favoriteDetailLoading.value = _favoriteDetailLoading.value + fav.id
             try {
-                val nowIso = Instant.now().toString()
-                val journeys = repo.searchJourneys(fav.fromId, fav.toId, nowIso, isDeparture = true, results = 1)
+                // Search from fav.timeFrom so the detail reflects the scheduled connection
+                val timeFrom = java.time.LocalTime.parse(
+                    fav.timeFrom, java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                val now = LocalDateTime.now()
+                var searchTime = now.toLocalDate().atTime(timeFrom)
+                // If that time was more than 30 min ago today, look at tomorrow
+                if (searchTime.isBefore(now.minusMinutes(30))) searchTime = searchTime.plusDays(1)
+                val isoTime = searchTime.atZone(ZoneId.systemDefault()).toInstant().toString()
+
+                val journeys = repo.searchJourneys(fav.fromId, fav.toId, isoTime, isDeparture = true, results = 1)
                 _favoriteDetailJourneys.value = _favoriteDetailJourneys.value + (fav.id to journeys.firstOrNull())
             } catch (_: Exception) {
             } finally {
