@@ -350,6 +350,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ---- Favorite detail journey (for dialog leg view) ----
+
+    private val _favoriteDetailJourneys = MutableStateFlow<Map<String, JourneyUi?>>(emptyMap())
+    val favoriteDetailJourneys = _favoriteDetailJourneys.asStateFlow()
+
+    private val _favoriteDetailLoading = MutableStateFlow<Set<String>>(emptySet())
+    val favoriteDetailLoading = _favoriteDetailLoading.asStateFlow()
+
+    fun loadFavoriteDetail(fav: Favorite) {
+        if (fav.id in _favoriteDetailLoading.value) return
+        viewModelScope.launch {
+            _favoriteDetailLoading.value = _favoriteDetailLoading.value + fav.id
+            try {
+                val nowIso = Instant.now().toString()
+                val journeys = repo.searchJourneys(fav.fromId, fav.toId, nowIso, isDeparture = true, results = 1)
+                _favoriteDetailJourneys.value = _favoriteDetailJourneys.value + (fav.id to journeys.firstOrNull())
+            } catch (_: Exception) {
+            } finally {
+                _favoriteDetailLoading.value = _favoriteDetailLoading.value - fav.id
+            }
+        }
+    }
+
     // ---- Notification deep-link state ----
 
     private val _pendingFavoriteId = MutableStateFlow<String?>(null)

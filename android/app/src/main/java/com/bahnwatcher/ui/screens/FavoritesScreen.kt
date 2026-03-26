@@ -7,7 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bahnwatcher.data.model.Favorite
 import com.bahnwatcher.data.model.FavoriteStatus
+import com.bahnwatcher.data.model.JourneyUi
 import com.bahnwatcher.data.repository.AppSettings
 import com.bahnwatcher.ui.theme.*
 import com.bahnwatcher.ui.viewmodel.MainViewModel
@@ -35,6 +38,8 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
     val refreshing by vm.refreshingFav.collectAsState()
     val settings by vm.settings.collectAsState()
     val pendingFavoriteId by vm.pendingFavoriteId.collectAsState()
+    val detailJourneys by vm.favoriteDetailJourneys.collectAsState()
+    val detailLoading by vm.favoriteDetailLoading.collectAsState()
 
     // Auto-open detail dialog when arriving from a notification tap
     var notifDetailFavId by remember { mutableStateOf<String?>(null) }
@@ -49,6 +54,9 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
         FavoriteDetailDialog(
             fav = notifDetailFav,
             status = statuses[notifDetailFav.id],
+            detailJourney = detailJourneys[notifDetailFav.id],
+            loadingDetail = notifDetailFav.id in detailLoading,
+            onLoadDetail = { vm.loadFavoriteDetail(notifDetailFav) },
             onDismiss = { notifDetailFavId = null },
             onFindAlternatives = {
                 vm.prefillAlternatives(notifDetailFav.fromId, notifDetailFav.fromName,
@@ -117,6 +125,9 @@ fun FavoritesScreen(vm: MainViewModel, onNavigateToSettings: () -> Unit = {}) {
                         fav = fav,
                         status = statuses[fav.id],
                         isRefreshing = fav.id in refreshing,
+                        detailJourney = detailJourneys[fav.id],
+                        loadingDetail = fav.id in detailLoading,
+                        onLoadDetail = { vm.loadFavoriteDetail(fav) },
                         onRefresh = { vm.refreshFavorite(fav) },
                         onDelete = { vm.deleteFavorite(fav.id) },
                         onFindAlternatives = {
@@ -134,6 +145,9 @@ fun FavoriteCard(
     fav: Favorite,
     status: FavoriteStatus?,
     isRefreshing: Boolean,
+    detailJourney: JourneyUi? = null,
+    loadingDetail: Boolean = false,
+    onLoadDetail: () -> Unit = {},
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
     onFindAlternatives: () -> Unit = {}
@@ -162,6 +176,9 @@ fun FavoriteCard(
         FavoriteDetailDialog(
             fav = fav,
             status = status,
+            detailJourney = detailJourney,
+            loadingDetail = loadingDetail,
+            onLoadDetail = onLoadDetail,
             onDismiss = { showDetail = false },
             onFindAlternatives = { onFindAlternatives(); showDetail = false }
         )
@@ -284,9 +301,13 @@ fun FavoriteCard(
 fun FavoriteDetailDialog(
     fav: Favorite,
     status: FavoriteStatus?,
+    detailJourney: JourneyUi? = null,
+    loadingDetail: Boolean = false,
+    onLoadDetail: () -> Unit = {},
     onDismiss: () -> Unit,
     onFindAlternatives: (() -> Unit)? = null
 ) {
+    LaunchedEffect(fav.id) { onLoadDetail() }
     val dayLabels = listOf(1 to "Mo", 2 to "Di", 3 to "Mi", 4 to "Do", 5 to "Fr", 6 to "Sa", 0 to "So")
     val activeDays = fav.days.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
 
@@ -310,7 +331,10 @@ fun FavoriteDetailDialog(
             Text(fav.name, color = OnSurface, fontWeight = FontWeight.Bold)
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
                 // Route
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.TrendingFlat, null, tint = Cyan, modifier = Modifier.size(16.dp))
@@ -360,12 +384,38 @@ fun FavoriteDetailDialog(
                 }
 
                 if (status?.nextDeparture?.isNotEmpty() == true) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Default.Train, null, tint = OnSurfaceMuted, modifier = Modifier.size(14.dp))
-                        Text("Nächste Abfahrt: ${status.nextDeparture}", color = OnSurface, fontSize = 13.sp)
-                        if (status.platform.isNotEmpty()) {
-                            Text("Gleis ${status.platform}", color = Cyan, fontSize = 12.sp)
+                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Default.Train, null, tint = OnSurfaceMuted,
+                            modifier = Modifier.size(14.dp).padding(top = 2.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("Abfahrt: ${status.nextDeparture}",
+                                    color = OnSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                if (status.platform.isNotEmpty()) {
+                                    Text("Gleis ${status.platform}", color = Cyan, fontSize = 12.sp)
+                                }
+                            }
+                            Text("ab ${fav.fromName}", color = OnSurfaceMuted, fontSize = 11.sp)
                         }
+                    }
+                }
+
+                // Full journey leg breakdown
+                when {
+                    loadingDetail -> {
+                        Row(modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = Cyan
+                            )
+                        }
+                    }
+                    detailJourney != null && detailJourney.legs.count { it.walking != true } > 1 -> {
+                        HorizontalDivider(color = Border)
+                        JourneyLegsDetail(legs = detailJourney.legs, showLabels = true)
                     }
                 }
 

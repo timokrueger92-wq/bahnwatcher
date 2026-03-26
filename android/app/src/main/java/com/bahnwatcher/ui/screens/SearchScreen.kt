@@ -545,12 +545,28 @@ fun JourneyCard(journey: JourneyUi, onSave: () -> Unit) {
 }
 
 @Composable
-fun JourneyLegsDetail(legs: List<Leg>) {
+fun JourneyLegsDetail(legs: List<Leg>, showLabels: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        var trainLegIndex = 0
         legs.forEachIndexed { index, leg ->
             if (leg.walking == true) {
                 WalkingLegRow()
             } else {
+                if (showLabels) {
+                    val label = if (trainLegIndex == 0) "Abfahrt" else "Umstieg"
+                    val labelColor = if (trainLegIndex == 0) Cyan else Warning
+                    Surface(
+                        color = labelColor.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            label, color = labelColor,
+                            fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                trainLegIndex++
                 TrainLegRow(leg)
             }
             // Transfer time between two train legs
