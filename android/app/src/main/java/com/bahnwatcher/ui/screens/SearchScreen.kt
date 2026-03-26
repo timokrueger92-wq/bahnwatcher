@@ -241,6 +241,7 @@ fun SearchScreen(vm: MainViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StationField(
     label: String,
@@ -254,8 +255,15 @@ fun StationField(
     onDismissSuggestions: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    ExposedDropdownMenuBox(
+        expanded = isActive && suggestions.isNotEmpty(),
+        onExpandedChange = {},
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Icon(icon, contentDescription = null, tint = OnSurfaceMuted, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             TextField(
@@ -271,7 +279,9 @@ fun StationField(
                     unfocusedTextColor = OnSurface
                 ),
                 singleLine = true,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .menuAnchor(MenuAnchorType.PrimaryEditable, true)
             )
             if (value.isNotEmpty()) {
                 IconButton(onClick = onClear, modifier = Modifier.size(24.dp)) {
@@ -279,12 +289,10 @@ fun StationField(
                 }
             }
         }
-        DropdownMenu(
+        ExposedDropdownMenu(
             expanded = isActive && suggestions.isNotEmpty(),
             onDismissRequest = onDismissSuggestions,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(SurfaceDark)
+            containerColor = SurfaceDark
         ) {
             suggestions.take(6).forEach { stop ->
                 DropdownMenuItem(
