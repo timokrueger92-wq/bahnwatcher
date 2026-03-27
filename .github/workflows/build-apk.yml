@@ -23,6 +23,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+          cache-disabled: true
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -39,7 +40,7 @@ jobs:
         working-directory: android
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: ./gradlew assembleDebug --no-daemon --stacktrace --refresh-dependencies
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/BahnWatcher-v1.0.${{ github.run_number }}.apk
