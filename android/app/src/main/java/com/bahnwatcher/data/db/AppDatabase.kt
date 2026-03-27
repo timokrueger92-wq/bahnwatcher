@@ -2,6 +2,7 @@ package com.bahnwatcher.data.db
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bahnwatcher.data.model.Favorite
 import kotlinx.coroutines.flow.Flow
