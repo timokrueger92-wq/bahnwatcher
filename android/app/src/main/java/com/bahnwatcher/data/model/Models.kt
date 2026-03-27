@@ -20,7 +20,8 @@ data class Favorite(
     val lastStatus: String = "unknown", // "ok", "delay", "cancelled", "unknown"
     val lastDelay: Int = 0,
     val lastPlatform: String = "",
-    val lastChecked: Long = 0L
+    val lastChecked: Long = 0L,
+    val refreshToken: String = ""  // HAFAS refresh token to reconstruct exact journey
 )
 
 // ---- API Response Models ----
@@ -44,6 +45,10 @@ data class JourneysResponse(
 data class Journey(
     val legs: List<Leg>?,
     val refreshToken: String?
+)
+
+data class RefreshJourneyResponse(
+    val journey: Journey?
 )
 
 data class Leg(
@@ -115,7 +120,8 @@ data class JourneyUi(
     val from: String,
     val to: String,
     val fromId: String,
-    val toId: String
+    val toId: String,
+    val refreshToken: String = ""
 )
 
 data class FavoriteStatus(
