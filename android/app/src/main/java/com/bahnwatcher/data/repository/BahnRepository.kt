@@ -138,9 +138,43 @@ class BahnRepository(private val context: Context) {
                 from = firstLeg.origin?.name ?: "",
                 to = lastLeg.destination?.name ?: "",
                 fromId = firstLeg.origin?.id ?: fromId,
-                toId = lastLeg.destination?.id ?: toId
+                toId = lastLeg.destination?.id ?: toId,
+                refreshToken = journey.refreshToken ?: ""
             )
         } ?: emptyList()
+    }
+
+    suspend fun refreshJourney(refreshToken: String): JourneyUi? {
+        val journey = runCatching { api.refreshJourney(refreshToken).journey }
+            .getOrNull() ?: return null
+        val legs = journey.legs ?: return null
+        val firstLeg = legs.firstOrNull() ?: return null
+        val lastLeg = legs.lastOrNull() ?: return null
+        val depTime = firstLeg.departure ?: firstLeg.plannedDeparture ?: return null
+        val arrTime = lastLeg.arrival ?: lastLeg.plannedArrival ?: return null
+        val plannedDep = firstLeg.plannedDeparture ?: depTime
+        val plannedArr = lastLeg.plannedArrival ?: arrTime
+        val durationMin = ChronoUnit.MINUTES.between(Instant.parse(depTime), Instant.parse(arrTime)).toInt()
+        val transfers = legs.count { !(it.walking ?: false) } - 1
+        return JourneyUi(
+            departure = formatTime(depTime),
+            plannedDeparture = formatTime(plannedDep),
+            arrival = formatTime(arrTime),
+            plannedArrival = formatTime(plannedArr),
+            durationMin = durationMin,
+            transfers = maxOf(0, transfers),
+            hasWalking = legs.any { it.walking == true },
+            cancelled = legs.any { it.cancelled == true },
+            departureDelay = (firstLeg.departureDelay ?: 0) / 60,
+            arrivalDelay = (lastLeg.arrivalDelay ?: 0) / 60,
+            platform = firstLeg.departurePlatform ?: firstLeg.plannedDeparturePlatform ?: firstLeg.platform ?: firstLeg.plannedPlatform ?: "",
+            legs = legs,
+            from = firstLeg.origin?.name ?: "",
+            to = lastLeg.destination?.name ?: "",
+            fromId = firstLeg.origin?.id ?: "",
+            toId = lastLeg.destination?.id ?: "",
+            refreshToken = journey.refreshToken ?: refreshToken
+        )
     }
 
     suspend fun getDepartures(stopId: String, whenIso: String? = null): List<Departure> {

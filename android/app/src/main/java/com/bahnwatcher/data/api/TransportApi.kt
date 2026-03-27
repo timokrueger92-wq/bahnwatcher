@@ -3,6 +3,7 @@ package com.bahnwatcher.data.api
 import com.bahnwatcher.data.model.Departure
 import com.bahnwatcher.data.model.JourneysResponse
 import com.bahnwatcher.data.model.NearbyStop
+import com.bahnwatcher.data.model.RefreshJourneyResponse
 import com.bahnwatcher.data.model.StopLocation
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -33,6 +34,11 @@ interface TransportApiService {
         @Query("nationalExpress") nationalExpress: Boolean? = null,
         @Query("national") national: Boolean? = null
     ): JourneysResponse
+
+    @GET("journeys/{refreshToken}")
+    suspend fun refreshJourney(
+        @Path("refreshToken", encoded = true) refreshToken: String
+    ): RefreshJourneyResponse
 
     @GET("stops/{id}/departures")
     suspend fun getDepartures(
