@@ -25,6 +25,9 @@ jobs:
           gradle-version: '8.9'
           cache-disabled: true
 
+      - name: Clear pre-installed Compose/Material3 cache
+        run: rm -rf ~/.gradle/caches/modules-2/files-2.1/androidx.compose.material3 ~/.gradle/caches/modules-2/metadata-2.103/files-2.1/androidx.compose.material3
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
